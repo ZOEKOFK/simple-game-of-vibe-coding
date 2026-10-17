@@ -70,15 +70,20 @@
 ```
 docs/       需求分析、系统分析、系统设计、平衡性说明、开发计划等文档
 src/        全部源代码（清单见下）
-assets/     音效、字体等资源（当前全部音效为程序合成，暂未使用）
+assets/     游戏资源：sprites/ 美术贴图、LICENSE_*.txt 资源授权声明（T12）
 README.md   本文件
 ```
+
+## 美术资源（T12）
+
+游戏内全部角色 / 敌人 / 弹丸 / 经验宝石 / 飞刃贴图来自 [Kenney.nl](https://kenney.nl/) 的免费素材包（均 **CC0 公共领域授权**，可免费商用），版权声明见 `assets/LICENSE_kenney_topdown_shooter.txt` 与 `assets/LICENSE_kenney_particle_pack.txt`。贴图经 `src/assets.h/.cpp` 惰性加载并统一绘制，仅在 `assets/sprites/` 保留本项目使用的 8 张贴图。
 
 ## src/ 文件清单（与 docs/03_系统设计.md §1.1 一致）
 
 | 文件 | 归属模块 | 一句话职责 |
 |---|---|---|
 | main.cpp | 入口 | 创建 GameEngine 并进入主循环 |
+| assets.h / assets.cpp | 素材 | 贴图惰性加载缓存与统一绘制、退出释放（T12） |
 | constants.h | 全局常量 | 数值基线集中定义（分模块命名空间） |
 | game.h / game.cpp | 引擎核心 | GameEngine：状态机、固定时间步主循环、碰撞编排、性能日志 |
 | player.h / player.cpp | 玩家 | 移动/受击/无敌帧/击退，持有武器与 Stats |

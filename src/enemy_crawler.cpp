@@ -1,6 +1,7 @@
 // enemy_crawler.cpp —— 爬行者实现（T3：追踪+分离力+接触标记；T5：接触数值/统一碰撞判定）
 #include "enemy_crawler.h"
 
+#include "assets.h"    // T12：僵尸贴图替代几何圆形
 #include "collision.h"  // T5：统一圆-圆检测
 #include "constants.h"
 #include "game.h"     // GameContext 完整定义（分离力需遍历敌人列表）
@@ -62,9 +63,11 @@ void Crawler::decide(float dt, const Vector2& playerPos, GameContext& ctx) {
 }
 
 void Crawler::draw() const {
-    // 红色圆形 + 描边，与玩家蓝色明显区分；接触中时描边变亮黄（可观察的接触标记）
-    DrawCircleV(pos_, radius_, constants::enemy::kCrawlerColor);
-    DrawCircleLines(static_cast<int>(pos_.x), static_cast<int>(pos_.y), radius_,
-                    touchingPlayer_ ? constants::enemy::kContactColor
-                                    : constants::enemy::kCrawlerOutlineColor);
+    // T12：僵尸贴图替代几何圆形——尺寸≈2.4×碰撞半径（视觉略大于碰撞盒）；
+    //     接触中时叠加亮黄描边环（保留可观察的接触标记语义）
+    assets::drawCentered(assets::enemyCrawler(), pos_, radius_ * 2.4f, 0.0f, WHITE);
+    if (touchingPlayer_) {
+        DrawCircleLines(static_cast<int>(pos_.x), static_cast<int>(pos_.y), radius_ + 3.0f,
+                        constants::enemy::kContactColor);
+    }
 }

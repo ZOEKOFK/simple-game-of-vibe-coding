@@ -6,8 +6,9 @@
 #include <string>
 
 #include "arena.h"
+#include "assets.h"   // T12：玩家贴图（替代几何圆形绘制）
 #include "constants.h"
-#include "raymath.h"        // Vector2Length（raylib.h 未包含 raymath，需显式引入）
+#include "raymath.h"  // Vector2Length（raylib.h 未包含 raymath，需显式引入）
 #include "weapon_pistol.h"  // 初始武器：手枪
 
 Player::Player() {
@@ -132,14 +133,8 @@ void Player::draw() const {
     // 无敌帧闪烁（T5）：每 0.2s 隐藏半周期，视觉提示"无敌中"
     if (invincibleTimer_ > 0.0f && std::fmod(invincibleTimer_, 0.2f) < 0.1f) return;
 
+    // T12：玩家贴图替代几何圆形——以朝向旋转、尺寸≈2.2×碰撞半径（视觉略大于碰撞盒）
     const float r = constants::player::kRadius;
-    // 身体：蓝色圆形 + 深色描边（T2 临时几何形象，后续任务细化）
-    DrawCircleV(pos_, r, BLUE);
-    DrawCircleLines(static_cast<int>(pos_.x), static_cast<int>(pos_.y), r, DARKBLUE);
-    // 朝向指示线：从圆边缘沿朝向伸出
-    const Vector2 lineStart{pos_.x + lastMoveDir_.x * (r - 4.0f),
-                            pos_.y + lastMoveDir_.y * (r - 4.0f)};
-    const Vector2 lineEnd{pos_.x + lastMoveDir_.x * (r + 12.0f),
-                          pos_.y + lastMoveDir_.y * (r + 12.0f)};
-    DrawLineEx(lineStart, lineEnd, 3.0f, YELLOW);
+    const float deg = std::atan2(lastMoveDir_.y, lastMoveDir_.x) * (180.0f / PI) + 90.0f;
+    assets::drawCentered(assets::player(), pos_, r * 2.2f, deg, WHITE);
 }

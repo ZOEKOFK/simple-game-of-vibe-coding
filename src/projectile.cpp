@@ -4,6 +4,7 @@
 #include <algorithm>
 
 #include "arena.h"
+#include "assets.h"    // T12：弹丸贴图替代几何圆形
 #include "constants.h"
 #include "raymath.h"  // Vector2Length
 
@@ -37,11 +38,13 @@ void Projectile::update(float dt) {
 
 void Projectile::draw() const {
     if (!alive_) return;
-    // T8：阵营区分绘制——玩家黄弹 / 敌方红橙弹（视觉可辨，方便走位躲避）
-    const Color c = faction_ == Faction::EnemySide
-                        ? constants::projectile::kEnemyBulletColor
-                        : constants::projectile::kBulletColor;
-    DrawCircleV(pos_, radius_, c);
+    // T12：弹丸贴图替代几何圆形——阵营区分靠 tint（玩家黄 flare / 敌方红 circle），
+    //     贴图等比放大至≈2.2×碰撞半径，视觉略大于碰撞盒
+    const bool enemy = faction_ == Faction::EnemySide;
+    const Texture2D tex = enemy ? assets::enemyBullet() : assets::bullet();
+    assets::drawCentered(tex, pos_, radius_ * 2.2f, 0.0f,
+                         enemy ? constants::projectile::kEnemyBulletColor
+                               : constants::projectile::kBulletColor);
 }
 
 bool Projectile::hasHit(const Enemy* e) const {

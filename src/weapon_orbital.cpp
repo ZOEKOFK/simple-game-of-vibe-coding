@@ -5,6 +5,7 @@
 #include <memory>
 #include <string>
 
+#include "assets.h"    // T12：飞刃贴图替代几何圆形
 #include "collision.h"  // 圆-圆接触判定（T5 统一接口）
 #include "enemy.h"      // Enemy：位置/半径/takeDamage/isDead
 #include "game.h"       // GameContext：敌人遍历 + 玩家指针（吸血结算）
@@ -92,13 +93,13 @@ void OrbitalBlade::draw(const Player& player) const {
         const float a = angle_ + bladeStep * i;
         const Vector2 bladePos{player.pos().x + std::cos(a) * constants::weapon::kOrbitalRadius,
                                player.pos().y + std::sin(a) * constants::weapon::kOrbitalRadius};
-        // 光晕提示杀伤范围 + 银白刃体
+        // T12：光晕圆保留（提示杀伤范围）+ 银白刀光贴图替代几何刃体；
+        //     贴图按公转相位旋转，刀锋指向切线方向，速度感更直观
         DrawCircleV(bladePos, constants::weapon::kOrbitalBladeRadius * 2.2f,
                     constants::weapon::kOrbitalBladeGlow);
-        DrawCircleV(bladePos, constants::weapon::kOrbitalBladeRadius,
-                    constants::weapon::kOrbitalBladeColor);
-        DrawCircleLines(static_cast<int>(bladePos.x), static_cast<int>(bladePos.y),
-                        static_cast<int>(constants::weapon::kOrbitalBladeRadius),
-                        DARKGRAY);
+        const float bladeDeg = (a + PI * 0.5f) * (180.0f / PI);
+        assets::drawCentered(assets::orbitalBlade(), bladePos,
+                             constants::weapon::kOrbitalBladeRadius * 2.6f,
+                             bladeDeg, constants::weapon::kOrbitalBladeColor);
     }
 }

@@ -19,6 +19,7 @@
 #include <string>
 
 #include "arena.h"
+#include "assets.h"     // T12：素材贴图统一加载/释放
 #include "collision.h"  // T5：统一圆-圆检测；T11：空间哈希网格
 #include "constants.h"
 
@@ -417,10 +418,11 @@ void GameEngine::draw() {
                 drawArena();                                  // 地面/网格/围墙（世界坐标）
                 for (const auto& e : enemies_) {              // 敌人（世界坐标）
                     e->draw();
-                    // T11：受击闪白——白色半透明层叠加（命中瞬间全亮，0.1s 内渐隐）
+                    // T11：受击闪白——白色泛光层叠加（命中瞬间全亮，0.1s 内渐隐；
+                    //      T12 改为略大于贴图的泛光圆，避免盖住贴图细节）
                     const float fa = e->hitFlashAlpha();
                     if (fa > 0.0f) {
-                        DrawCircleV(e->pos(), e->radius(),
+                        DrawCircleV(e->pos(), e->radius() * 1.5f,
                                     Color{255, 255, 255,
                                           static_cast<unsigned char>(140.0f * fa + 20.0f)});
                     }
@@ -562,6 +564,7 @@ void GameEngine::run() {
     ui_.unload();  // T6：窗口关闭前释放字体资源（避免 GL 上下文失效后析构报错）
     audio_.unload();      // T11：释放程序生成音效资源（CloseAudioDevice 前）
     CloseAudioDevice();   // T11：音频设备收尾（InitAudioDevice 成功后对称关闭）
+    assets::unloadAll();  // T12：关闭窗口前统一释放全部素材贴图
     UnloadRenderTexture(renderTex_);
     CloseWindow();
 }

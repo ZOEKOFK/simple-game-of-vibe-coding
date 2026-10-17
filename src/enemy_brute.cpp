@@ -3,6 +3,7 @@
 
 #include <cmath>  // sinf：蓄力闪烁
 
+#include "assets.h"    // T12：机器人贴图替代几何圆形
 #include "collision.h"
 #include "constants.h"
 #include "game.h"    // GameContext 完整定义（接触判定经 ctx.player 结算）
@@ -82,10 +83,14 @@ void Brute::draw() const {
     using constants::enemy::kBruteWindupColor;
     using constants::enemy::kBruteWindupRingColor;
 
+    // T12：本体由机器人贴图替代（尺寸≈2.2×碰撞半径，精英体型感仍靠大半径保持）；
+    //     状态着色改为对贴图 tint：蓄力=深红→亮红渐变+闪烁，冲锋=亮红，追踪/疲惫=深红。
+    //     警戒环/冲刺箭头/冲锋拖尾等预警与速度感特效全部保留，绘制在贴图之上。
+    const float size = radius_ * 2.2f;
     Color body = kBruteColor;
     switch (phase_) {
         case Phase::Windup: {
-            // 蓄力预警（AI 亮点）：主体深红→亮红渐变 + 高频闪烁 + 警戒环 + 冲刺方向箭头
+            // 蓄力预警（AI 亮点）：主体深红→亮红渐变 + 高频闪烁（通过 tint 通道色实现）
             const float p = 1.0f - windupTimer_ / constants::enemy::kBruteWindupTime;  // 0→1
             const float blink = 0.5f + 0.5f * sinf(windupTimer_ * 45.0f);              // 高频闪
             const float t = p * 0.65f + blink * 0.35f;
@@ -113,7 +118,7 @@ void Brute::draw() const {
             break;
         }
         case Phase::Charge: {
-            // 冲锋：亮红 + 身后拖尾两圈渐变（速度感）
+            // 冲锋：亮红 tint + 身后拖尾两圈渐变（速度感）
             body = kBruteChargeColor;
             const Color tail1{kBruteChargeColor.r, kBruteChargeColor.g, kBruteChargeColor.b, 90};
             const Color tail2{kBruteChargeColor.r, kBruteChargeColor.g, kBruteChargeColor.b, 45};
@@ -128,7 +133,7 @@ void Brute::draw() const {
             body = kBruteColor;  // 追踪/疲惫：深红本体
             break;
     }
-    DrawCircleV(pos_, radius_, body);
+    assets::drawCentered(assets::enemyBrute(), pos_, size, 0.0f, body);
     DrawCircleLines(static_cast<int>(pos_.x), static_cast<int>(pos_.y), radius_,
                     constants::enemy::kBruteOutlineColor);
 }
