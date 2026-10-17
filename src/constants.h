@@ -99,4 +99,32 @@ constexpr float kSize = 12.0f;  // 绿色小方块边长（px）
 constexpr Color kColor {60, 220, 120, 255};  // 绿色（与敌人红、子弹黄区分）
 }  // namespace xp_orb
 
+// ---- 升级（docs/03 4.5 经验曲线；T6 仅显示，升级逻辑 T7 迁 UpgradeSystem）----
+namespace upgrade {
+constexpr float kBaseExpNeeded = 20.0f;  // 升第 1 级所需经验
+constexpr float kExpPerLevel   = 10.0f;  // 每级递增：升 L 级所需 = 20 + 10×(L-1)
+}  // namespace upgrade
+
+// ---- HUD（T6：屏幕空间 UI；颜色/字号保证深色背景下清晰）----
+namespace ui {
+constexpr const char* kFontPathYaHei  = "C:/Windows/Fonts/msyh.ttc";   // 中文字体：微软雅黑
+constexpr const char* kFontPathSimHei = "C:/Windows/Fonts/simhei.ttf"; // 回退字体：黑体
+// 中文字符集（供字体图集加载；后续任务新增 UI 文案时需在此追加对应汉字）
+constexpr const char* kCnCharSet =
+    "第波剩余时间敌人击杀手枪自动射击死亡逻辑将在后续任务实现方向键移动刷怪退出·（）";
+constexpr int   kFontBaseSize  = 32;   // 字体图集基准字号（px），绘制时按需缩放
+constexpr int   kHudMargin     = 16;   // HUD 距屏幕边缘边距（px）
+constexpr int   kExpBarWidth   = 260;  // 经验条宽（px）
+constexpr int   kExpBarHeight  = 12;   // 经验条高（px）
+constexpr int   kHpBarWidth    = 260;  // 血条宽（px）
+constexpr int   kHpBarHeight   = 18;   // 血条高（px）
+constexpr float kHpLerpSpeed   = 8.0f; // 血条平滑趋近速度（/s，指数趋近避免跳变）
+constexpr Color kExpBarColor   {240, 180, 40, 255};  // 经验条填充（黄）
+constexpr Color kBarBgColor    {40, 44, 54, 255};    // 条底（深灰）
+constexpr Color kHpBarBgColor  {150, 32, 32, 255};   // 血条底（暗红）
+constexpr Color kHpFillColor   {60, 190, 80, 255};   // 血条填充（绿）
+constexpr Color kTextMainColor {230, 230, 230, 255}; // 主文字（近白）
+constexpr Color kTextDimColor  {170, 170, 170, 255}; // 次级文字（灰）
+}  // namespace ui
+
 }  // namespace constants

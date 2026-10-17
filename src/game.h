@@ -7,6 +7,7 @@
 // T3：F1 调试刷怪 + 敌人 AI 更新与绘制。
 // T4：武器自动索敌/开火、子弹飞行与命中判定（命中暂只移除子弹）。
 // T5：伤害结算（子弹-敌人/敌人-玩家）、击杀移除、经验点掉落与玩家受击反馈。
+// T6：HUD（等级/经验条/血条/波次占位/敌人/击杀/武器说明，屏幕空间绘制）。
 // ============================================================
 #include <memory>
 #include <vector>
@@ -17,6 +18,7 @@
 #include "enemy_spawner.h"  // T3 调试刷怪
 #include "projectile.h"     // 子弹容器需要完整类型（T4）
 #include "xp_orb.h"         // 经验点容器需要完整类型（T5）
+#include "ui.h"             // HUD（T6）
 
 // ------------------------------------------------------------
 // GameContext：各系统间的只读上下文总线（字段在后续任务补充）
@@ -55,5 +57,12 @@ private:
     EnemySpawner spawner_{};      // 敌人生成器（T3 F1 调试刷怪）
     std::vector<std::unique_ptr<Projectile>> projectiles_{};  // 场上子弹容器（T4）
     std::vector<XPOrb> xpOrbs_{};   // 场上经验点（T5：击杀掉落视觉反馈；吸取 T7）
-    int hitCount_ = 0;            // T4 调试计数：子弹命中敌人次数
+
+    UIManager ui_{};         // 进行中游戏 HUD（T6：经验/血条/波次/击杀/武器说明）
+    int hitCount_ = 0;      // T4 调试计数：子弹命中敌人次数
+    int killCount_ = 0;     // T6：累计击杀数（右上角 HUD）
+    int wave_ = 1;          // T6 占位：当前波次（T8 波次系统接管）
+    float waveTimer_ = 0.0f; // T6 占位：波次计时 0（T8 接管）
+    int level_ = 1;         // T6 显示：玩家等级（经验/升级逻辑 T7 迁 UpgradeSystem）
+    int exp_ = 0;           // T6 显示：当前等级内经验（拾取 T7 累积）
 };

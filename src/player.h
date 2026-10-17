@@ -33,6 +33,8 @@ public:
     int   hp() const;             // 当前生命
     float pickupRadius() const;   // 拾取半径
     const Stats& stats() const;   // 属性中心（词条修改点）
+    // T6 HUD：本局武器列表（展示当前武器名与说明；装备类词条 T7 增改）
+    const std::vector<std::unique_ptr<Weapon>>& weapons() const { return weapons_; }
 
 private:
     Vector2 pos_{constants::player::kStartX,

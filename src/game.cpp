@@ -5,6 +5,7 @@
 // T3：F1 调试刷怪 + 敌人追踪/分离 AI 更新与绘制、临调敌人数显示。
 // T4：武器自动索敌/开火、子弹飞行与命中判定（命中暂只移除子弹）、命中次数显示。
 // T5：伤害结算（命中扣血/击杀掉落经验点/接触受伤）、击退与无敌帧、HP 归零锁 0。
+// T6：HUD（等级/经验条/血条/波次占位/敌人/击杀/武器说明）+ 中文字体加载。
 // ============================================================
 #include "game.h"
 
@@ -61,6 +62,7 @@ void GameEngine::update(float dt) {
     // T2：仅 PLAYING 状态响应移动（在固定步长内更新，逻辑与帧率解耦）
     if (state_ == GameState::PLAYING) {
         player_.update(dt, readMoveInput());
+        ui_.update(dt, player_);  // T6：血条显示值平滑趋近实际 HP
 
         // T3：F1 临时刷 10 只爬行者用于调试（正式波次逻辑 T8 接入）
         if (IsKeyPressed(KEY_F1)) {
@@ -94,7 +96,8 @@ void GameEngine::update(float dt) {
                     p->markDead();  // 命中子弹消失
                     ++hitCount_;
                     if (e->takeDamage(p->damage())) {
-                        // 击杀：死亡位置掉落经验点（绿色小方块，视觉反馈）
+                        // 击杀：累计击杀数（T6 HUD）并掉落经验点（绿色小方块，吸取 T7）
+                        ++killCount_;
                         xpOrbs_.emplace_back(e->pos(),
                                              static_cast<float>(e->xpValue()));
                     }
@@ -132,21 +135,30 @@ void GameEngine::draw() {
                 player_.draw();                               // 玩家（世界坐标）
             }
             EndMode2D();
-            // 操作提示与临调显示（屏幕空间；正式 UI 由 T6 实现）
-            DrawText("WASD / 方向键 移动    F1 刷怪    Esc 退出", 20, 20, 20, LIGHTGRAY);
-            const std::string countText = "敌人数量: " + std::to_string(enemies_.size());
-            DrawText(countText.c_str(), 20, 48, 20, GOLD);
-            const std::string hitText = "命中次数: " + std::to_string(hitCount_);
-            DrawText(hitText.c_str(), 20, 68, 20, YELLOW);
-            const std::string hpText = "玩家HP: " + std::to_string(player_.hp()) +
-                                       " / " + std::to_string(player_.maxHp());
-            DrawText(hpText.c_str(), 20, 96, 20, RED);
+            // ---- T6 HUD（屏幕空间，替换 T4/T5 左上角临时调试文字）----
+            HudSnapshot snap;
+            snap.player = &player_;
+            snap.enemyCount = static_cast<int>(enemies_.size());
+            snap.wave = wave_;
+            snap.waveTimer = waveTimer_;
+            snap.killCount = killCount_;
+            snap.level = level_;
+            snap.exp = exp_;
+            snap.expToNext = constants::upgrade::kBaseExpNeeded +
+                             constants::upgrade::kExpPerLevel * (level_ - 1);
+            ui_.drawHUD(snap);
+
+            // 操作提示：屏幕左下角（T6 起改走中文字体，避免默认字体乱码）
+            ui_.drawText("WASD / 方向键 移动     F1 刷怪     Esc 退出",
+                         20.0f, constants::window::kLogicHeight - 36.0f,
+                         16, LIGHTGRAY);
             // T5 临时处理：HP 归零仅锁定为 0 并中央提示，正式死亡/结算流程 T10 实现
             if (player_.hp() <= 0) {
-                const char* deadText = "（死亡逻辑将在后续任务实现）";
-                const int textW = MeasureText(deadText, 28);
-                DrawText(deadText, (constants::window::kLogicWidth - textW) / 2,
-                         constants::window::kLogicHeight / 2 - 14, 28, RED);
+                // 字体不可用时回退英文文案（默认字体无 CJK 字形，防乱码）
+                ui_.drawCenterNotice(ui_.cnFontAvailable()
+                                         ? "（死亡逻辑将在后续任务实现）"
+                                         : "(Death logic to be implemented in later tasks)",
+                                     0.0f, 28, RED);
             }
         } else {
             // ---- T1 空壳展示（保留）：黑底 + 当前状态名 ----
@@ -195,6 +207,7 @@ void GameEngine::run() {
 
     renderTex_ = LoadRenderTexture(constants::window::kLogicWidth,
                                    constants::window::kLogicHeight);
+    ui_.load();  // T6：HUD 中文字体（LoadFontEx 需要 GL 上下文，必须在 InitWindow 后）
 
     // T2：初始化 2D 摄像机——offset 为逻辑分辨率中心、target 对准玩家出生点，
     //     使玩家始终位于屏幕正中（target 每帧在 draw() 中跟随玩家）。
@@ -221,6 +234,7 @@ void GameEngine::run() {
         draw();
     }
 
+    ui_.unload();  // T6：窗口关闭前释放字体资源（避免 GL 上下文失效后析构报错）
     UnloadRenderTexture(renderTex_);
     CloseWindow();
 }

@@ -11,6 +11,10 @@ public:
     explicit Pistol(const Stats* stats);
     ~Pistol() override = default;
 
+    // ---- 展示信息（T6 HUD 底部武器说明）----
+    const char* displayName() const override { return "手枪"; }
+    const char* description() const override { return "自动射击"; }
+
 protected:
     void fire(GameContext& ctx, const Player& player, const Vector2& targetPos) override;  // T4
 };

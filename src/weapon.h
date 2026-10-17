@@ -28,6 +28,10 @@ public:
     // ---- 类型信息（供 UI 展示与强化判重）----
     const std::string& typeId() const;  // 注册名，如 "pistol" / "shotgun" / "orbital"
 
+    // ---- 展示信息（T6 HUD 显示；默认回退注册名，子类按需覆写）----
+    virtual const char* displayName() const { return typeId_.c_str(); }  // 显示名（如"手枪"）
+    virtual const char* description() const { return ""; }               // 一句话说明（如"自动射击"）
+
     // ---- 工厂注册机制（新增武器只增不改的关键）----
     using Factory = std::function<std::unique_ptr<Weapon>(const Stats* stats)>;
     static std::unordered_map<std::string, Factory>& registry();   // 注册表（定义于 weapon.cpp）
