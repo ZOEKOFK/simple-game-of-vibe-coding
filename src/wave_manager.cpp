@@ -9,9 +9,9 @@
 
 namespace {
 
-// [0,1) 均匀随机数（基于 raylib 随机源，与 enemy_spawner 同源）
+// [0,1) 均匀随机数；GetRandomValue 上限 32767（raylib 约定，超出触发警告且结果不可靠）
 float random01() {
-    return static_cast<float>(GetRandomValue(0, 100000)) / 100000.0f;
+    return static_cast<float>(GetRandomValue(0, 32767)) / 32767.0f;
 }
 
 }  // namespace
