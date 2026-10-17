@@ -20,6 +20,7 @@ public:
     bool takeDamage(float amount);            // T5：扣血并返回是否死亡（hp≤0 锁定 0 并置死亡标志）
     bool isDead() const;
     virtual void draw() const = 0;            // 子类自绘（如红色圆形，与玩家区分）
+    void scaleHp(float multiplier);           // T8：波次生命倍率（出生时调用一次：maxHp/hp 同乘）
 
     // ---- 通用属性查询 ----
     const Vector2& pos() const;

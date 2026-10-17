@@ -4,6 +4,7 @@
 // T6：左上 等级/经验条/血条（平滑过渡）；右上 波次/计时占位/敌人/击杀；
 //     底部居中 当前武器说明。全部屏幕空间绘制（不随镜头移动）。
 // T7：升级三选一卡片（稀有度配色 + 键盘 1/2/3 或鼠标点击 + 悬停描边）。
+// T8：右上波次状态行（波间倒计时"下一波 X: 3"/刷怪中剩余/清场剩余敌人）。
 //     菜单/结算等界面在 T10 扩展（docs/03 类图预留）。
 // ============================================================
 #include <vector>
@@ -17,8 +18,11 @@ class Player;
 struct HudSnapshot {
     const Player* player = nullptr;  // HP/武器信息源
     int   enemyCount = 0;            // 场上敌人数量
-    int   wave = 1;                  // 当前波次（T6 占位显示，T8 波次系统接管）
-    float waveTimer = 0.0f;          // 波次计时（T6 占位 0，T8 接管）
+    int   wave = 1;                  // 当前波号（T8：WAITING 期间即"下一波"波号）
+    int   waveState = 0;             // T8 波次状态：0 波间倒计时 / 1 刷怪中 / 2 清场战斗
+    float restTimeLeft = 1.0f;       // T8 波间剩余倒计时（秒，显示 3/2/1）
+    int   remainingToSpawn = 0;      // T8 本波剩余待投放（SPAWNING 状态显示）
+    int   aliveInWave = 0;           // T8 本波剩余存活（FIGHTING/刷怪后显示）
     int   killCount = 0;             // 累计击杀数
     int   level = 1;                 // 玩家等级（T7 起由 UpgradeSystem 提供）
     int   exp = 0;                   // 当前等级内经验

@@ -6,12 +6,13 @@
 #include "raymath.h"  // Vector2Length
 
 Projectile::Projectile(const Vector2& pos, const Vector2& dir, float speed,
-                       float damage, float maxRange) {
+                       float damage, float maxRange, Faction faction) {
     pos_ = pos;
     vel_ = Vector2{dir.x * speed, dir.y * speed};
     radius_ = constants::projectile::kBulletRadius;
     damage_ = damage;
     rangeLeft_ = maxRange;
+    faction_ = faction;
 }
 
 void Projectile::update(float dt) {
@@ -34,5 +35,9 @@ void Projectile::update(float dt) {
 
 void Projectile::draw() const {
     if (!alive_) return;
-    DrawCircleV(pos_, radius_, constants::projectile::kBulletColor);
+    // T8：阵营区分绘制——玩家黄弹 / 敌方红橙弹（视觉可辨，方便走位躲避）
+    const Color c = faction_ == Faction::EnemySide
+                        ? constants::projectile::kEnemyBulletColor
+                        : constants::projectile::kBulletColor;
+    DrawCircleV(pos_, radius_, c);
 }

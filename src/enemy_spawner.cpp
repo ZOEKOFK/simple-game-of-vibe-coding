@@ -1,9 +1,11 @@
-// enemy_spawner.cpp —— EnemySpawner 实现（T3：边缘出生 + 安全距离；构成/倍率 T8）
+// enemy_spawner.cpp —— EnemySpawner 实现（T3：边缘出生 + 安全距离；T8：按类型生成）
 #include "enemy_spawner.h"
 
 #include "constants.h"
+#include "enemy_brute.h"    // T8：蛮牛（精英）
 #include "enemy_crawler.h"
-#include "raymath.h"  // Vector2Distance
+#include "enemy_spitter.h"  // T8：喷吐者（远程）
+#include "raymath.h"        // Vector2Distance
 
 namespace {
 
@@ -63,4 +65,23 @@ std::vector<std::unique_ptr<Enemy>> EnemySpawner::spawnWave(int count, const Vec
         out.push_back(std::make_unique<Crawler>(pickSpawnPos(playerPos)));
     }
     return out;
+}
+
+std::unique_ptr<Enemy> EnemySpawner::spawn(EnemyType type, const Vector2& playerPos,
+                                           float hpMultiplier) {
+    std::unique_ptr<Enemy> e;
+    switch (type) {
+        case EnemyType::Crawler:
+            e = std::make_unique<Crawler>(pickSpawnPos(playerPos));
+            break;
+        case EnemyType::Spitter:
+            e = std::make_unique<Spitter>(pickSpawnPos(playerPos));
+            break;
+        case EnemyType::Brute:
+            e = std::make_unique<Brute>(pickSpawnPos(playerPos));
+            break;
+    }
+    // T8：应用波次生命倍率（1 + 0.25×(n-1)；爬行者/喷吐者/蛮牛一视同仁，与难度曲线叠加）
+    if (e && hpMultiplier != 1.0f) e->scaleHp(hpMultiplier);
+    return e;
 }

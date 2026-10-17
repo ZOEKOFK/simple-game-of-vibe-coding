@@ -156,17 +156,31 @@ void UIManager::drawHUD(const HudSnapshot& s) const {
     drawTextAligned(hpText.c_str(), hpX + constants::ui::kHpBarWidth * 0.5f,
                     hpY + 1.0f, 16, constants::ui::kTextMainColor, 1);
 
-    // ---- 右上：波次 / 剩余时间（占位 0）/ 敌人 / 击杀 ----
+    // ---- 右上：第 X 波 / 波次状态行（T8）/ 敌人 / 击杀 ----
     const float rightX = static_cast<float>(W - m);
     const std::string waveText = fontValid_ ? ("第 " + std::to_string(s.wave) + " 波")
                                             : ("Wave " + std::to_string(s.wave));
     drawTextAligned(waveText.c_str(), rightX, static_cast<float>(m) - 4.0f, 20,
                     constants::ui::kTextMainColor, 2);
-    const std::string timeText = fontValid_
-        ? ("剩余时间: " + std::to_string(static_cast<int>(s.waveTimer)))
-        : ("Time: " + std::to_string(static_cast<int>(s.waveTimer)));  // 占位 0（T8 接管）
-    drawTextAligned(timeText.c_str(), rightX, static_cast<float>(m) + 30.0f, 16,
-                    constants::ui::kTextDimColor, 2);
+
+    // T8 状态行：0 波间倒计时（3,2,1）/ 1 刷怪中剩余投放 / 2 清场剩余敌人
+    std::string stateText;
+    Color stateColor = constants::ui::kTextDimColor;
+    if (s.waveState == 0) {
+        const int countdown = static_cast<int>(s.restTimeLeft) + 1;  // 3.0→3、0.01→1
+        stateText = fontValid_
+            ? ("下一波 " + std::to_string(s.wave) + ": " + std::to_string(countdown))
+            : ("Next wave " + std::to_string(s.wave) + ": " + std::to_string(countdown));
+        stateColor = constants::ui::kExpBarColor;  // 黄色：提示即将开刷
+    } else if (s.waveState == 1) {
+        stateText = fontValid_ ? ("刷怪中 剩余 " + std::to_string(s.remainingToSpawn))
+                               : ("Spawning: " + std::to_string(s.remainingToSpawn));
+    } else {
+        stateText = fontValid_ ? ("剩余敌人 " + std::to_string(s.aliveInWave))
+                               : ("Enemies left: " + std::to_string(s.aliveInWave));
+    }
+    drawTextAligned(stateText.c_str(), rightX, static_cast<float>(m) + 30.0f, 16,
+                    stateColor, 2);
     const std::string enemyText = fontValid_ ? ("敌人: " + std::to_string(s.enemyCount))
                                              : ("Enemies: " + std::to_string(s.enemyCount));
     drawTextAligned(enemyText.c_str(), rightX, static_cast<float>(m) + 52.0f, 16, GOLD, 2);

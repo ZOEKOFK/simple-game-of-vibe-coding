@@ -76,7 +76,59 @@ constexpr float kSpawnOutsideDepth  = 36.0f;  // 墙外出生：距墙外缘的�
 constexpr Color kCrawlerColor        {220, 60, 50, 255};
 constexpr Color kCrawlerOutlineColor {110, 30, 25, 255};
 constexpr Color kContactColor        {255, 210, 90, 255};
+
+// ---- 喷吐者：远程风筝射击怪（docs/03 4.3；T8，第 5 波起混入）----
+constexpr float kSpitterHp          = 30.0f;   // 生命
+constexpr float kSpitterSpeed       = 100.0f;  // 移速（px/s）
+constexpr float kSpitterRadius      = 14.0f;   // 碰撞半径
+constexpr float kSpitterMinDist     = 300.0f;  // 风筝下界：小于则远离玩家
+constexpr float kSpitterMaxDist     = 600.0f;  // 风筝上界：大于则接近玩家
+constexpr float kSpitterShootInterval      = 2.0f;   // 射击间隔（秒）
+constexpr float kSpitterProjectileSpeed   = 180.0f; // 敌弹弹速（≈玩家移速 0.8 倍：不躲会中、跑了躲得开）
+constexpr float kSpitterProjectileDamage  = 6.0f;   // 敌弹伤害
+constexpr float kSpitterProjectileRange   = 900.0f; // 敌弹最大射程（px）
+constexpr int   kSpitterXpValue     = 7;      // 击杀经验
+
+// ---- 蛮牛：精英冲锋怪（docs/03 4.3；T8，第 8 波起混入）----
+constexpr float kBruteHp           = 600.0f;  // 生命 = 爬行者 ×30
+constexpr float kBruteSpeed        = 84.0f;   // 移速 = 爬行者 ×0.7
+constexpr float kBruteRadius       = 28.0f;   // 碰撞半径 = 爬行者 ×2
+constexpr float kBruteContactDamage = 24.0f;  // 接触伤害 = 爬行者 ×3
+constexpr float kBruteWindupTime    = 0.8f;   // 蓄力时长（秒）：原地钉住、变色预警
+constexpr float kBruteChargeTime    = 1.0f;   // 冲锋时长（秒）
+constexpr float kBruteChargeSpeedMult = 3.0f; // 冲锋速度倍率：84×3=252 > 玩家 220，必须预读闪避
+constexpr float kBruteChargeCooldown  = 5.0f; // 冲锋冷却（秒）
+constexpr float kBruteWindupTriggerDist = 320.0f; // 蓄力触发距离：进入该距离开始蓄力（留预读窗口）
+constexpr int   kBruteXpValue      = 50;      // 击杀经验 = 爬行者 ×10
+// 配色：紫色识别远程兵；蛮牛深红，蓄力/冲锋变亮红是"可读的威胁"
+constexpr Color kSpitterColor        {170, 90, 200, 255};
+constexpr Color kSpitterOutlineColor {85, 45, 100, 255};
+constexpr Color kBruteColor          {160, 40, 40, 255};
+constexpr Color kBruteOutlineColor   {80, 20, 20, 255};
+constexpr Color kBruteWindupColor    {255, 80, 60, 255};
+constexpr Color kBruteChargeColor    {255, 30, 20, 255};
+constexpr Color kBruteWindupRingColor{255, 90, 70, 160};
 }  // namespace enemy
+
+// ---- 波次（docs/03 4.4：数量/生命曲线与构成权重；T8 WaveManager 生效）----
+namespace wave {
+constexpr float kRestTime         = 3.0f;   // 波间休整倒计时（秒）
+constexpr float kBatchInterval    = 0.5f;   // 刷怪批次间隔（秒）：分批投放避免一帧全刷
+constexpr int   kBatchSize        = 4;      // 每批次刷怪数（不足一批时一次放完）
+constexpr int   kBaseCount        = 8;      // 第 1 波敌人数
+constexpr int   kCountPerWave     = 4;      // 每波递增数：总数 = 8 + 4×(n-1)
+constexpr float kHpMultBase       = 1.0f;   // 生命倍率基数
+constexpr float kHpMultPerWave    = 0.25f;  // 每波生命倍率递增：1 + 0.25×(n-1)
+// 构成权重（docs/03 4.4；同波次内逐只随机，体现 Roguelite 随机性）
+constexpr int   kSpitterFirstWave = 5;      // 喷吐者首次混入波次
+constexpr int   kBruteFirstWave    = 8;      // 蛮牛首次混入波次
+constexpr int   kBruteMaxPerWave   = 2;      // 蛮牛每波投放上限
+constexpr float kCrawlerWeightMid  = 0.80f;  // 5~7 波爬行者权重
+constexpr float kCrawlerWeightLate = 0.70f;  // 8+ 波爬行者权重
+constexpr float kSpitterWeightMid  = 0.20f;  // 5~7 波喷吐者权重
+constexpr float kSpitterWeightLate = 0.22f;  // 8+ 波喷吐者权重
+constexpr float kBruteWeightLate   = 0.08f;  // 8+ 波蛮牛权重
+}  // namespace wave
 
 // ---- 武器（docs/03 4.6 数值基线；T4 先落地手枪）----
 namespace weapon {
@@ -92,6 +144,7 @@ constexpr float kBulletRadius   = 4.0f;    // 子弹碰撞半径
 constexpr float kBulletSpeed    = 600.0f;  // 弹速（px/s），方向在开火时归一化
 constexpr float kBulletMaxRange = 900.0f;  // 最大射程（px），超出自动消失
 constexpr Color kBulletColor    {255, 210, 60, 255};  // 黄色小圆
+constexpr Color kEnemyBulletColor {255, 90, 90, 255}; // T8 敌方弹体：红橙色圆（与玩家黄弹区分）
 }  // namespace projectile
 
 // ---- 经验点（T5：击杀掉落视觉反馈；拾取与吸取 T7）----
@@ -128,7 +181,7 @@ constexpr const char* kFontPathSimHei = "C:/Windows/Fonts/simhei.ttf"; // 回退
 constexpr const char* kCnCharSet =
     "第波剩余时间敌人击杀手枪自动射击死亡逻辑将在后续任务实现方向键移动刷怪退出·（）"
     "选择升级按或鼠标点击普通稀有史诗伤害强化攻健生命上限并回复高磁力拾取半径每秒"
-    "受伤获得暂补偿霰环绕飞刃单已取本次再韧性急促跑武器「」";
+    "受伤获得暂补偿霰环绕飞刃单已取本次再韧性急促跑武器「」下中一";
 constexpr int   kFontBaseSize  = 32;   // 字体图集基准字号（px），绘制时按需缩放
 constexpr int   kHudMargin     = 16;   // HUD 距屏幕边缘边距（px）
 constexpr int   kExpBarWidth   = 260;  // 经验条宽（px）

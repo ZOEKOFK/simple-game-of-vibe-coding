@@ -7,6 +7,7 @@
 // T5：伤害结算（命中扣血/击杀掉落经验点/接触受伤）、击退与无敌帧、HP 归零锁 0。
 // T6：HUD（等级/经验条/血条/波次占位/敌人/击杀/武器说明）+ 中文字体加载。
 // T7：经验吸取→升级三选一（UPGRADE 世界静止）→词条应用；Stats 全联动；每秒生命回复。
+// T8：波次系统（WaveManager 状态机接管刷怪）+ 喷吐者/蛮牛差异化 AI + 敌弹伤玩家。
 // ============================================================
 #include "game.h"
 
@@ -68,13 +69,16 @@ void GameEngine::update(float dt) {
         player_.update(dt, readMoveInput());
         ui_.update(dt, player_);  // T6：血条显示值平滑趋近实际 HP
 
-        // T3：F1 临时刷 10 只爬行者用于调试（正式波次逻辑 T8 接入）
+        // T3：F1 调试刷 10 只爬行者（T8 起为开发调试用快捷键，正式波次由 WaveManager 自动驱动）
         if (IsKeyPressed(KEY_F1)) {
             auto batch = spawner_.spawnWave(constants::enemy::kDebugSpawnCount, player_.pos());
             for (auto& e : batch) enemies_.push_back(std::move(e));
         }
 
-        GameContext ctx{&enemies_, &projectiles_, &player_, &xpOrbs_};
+        GameContext ctx{&enemies_, &projectiles_, &player_, &xpOrbs_, &spawner_};
+
+        // T8：波次状态机（WAITING 3s 倒计时 → SPAWNING 分批投放 → FIGHTING 清场判下一波）
+        waveManager_.update(dt, ctx);
 
         // T3：敌人 AI 更新（追踪 + 分离 + 接触标记；伤害结算 T5）
         for (const auto& e : enemies_) {
@@ -89,10 +93,12 @@ void GameEngine::update(float dt) {
             p->update(dt);
         }
 
-        // T5：子弹×敌人命中结算——朴素双循环（实体量大后的优化在 T11 换空间哈希）；
+        // T5/T8：子弹×敌人命中结算——朴素双循环（实体量大后的优化在 T11 换空间哈希）；
+        //     仅玩家阵营弹参与敌人命中（T8：喷吐者敌弹走下方"敌弹×玩家"结算，不伤同胞）；
         //     命中即单次伤害（穿透类武器后续扩展），击杀则掉落经验点（吸取 T7）
         for (const auto& p : projectiles_) {
             if (!p->alive()) continue;
+            if (p->faction() != Projectile::Faction::PlayerSide) continue;  // T8：敌弹跳过
             for (const auto& e : enemies_) {
                 if (!e || e->isDead()) continue;
                 if (collision::circlesOverlap(p->pos(), p->radius(),
@@ -102,11 +108,23 @@ void GameEngine::update(float dt) {
                     if (e->takeDamage(p->damage())) {
                         // 击杀：累计击杀数（T6 HUD）并掉落经验点（绿色小方块，吸取 T7）
                         ++killCount_;
+                        waveManager_.notifyEnemyDied();  // T8：本波存活账本递减（清场判定）
                         xpOrbs_.emplace_back(e->pos(),
                                              static_cast<float>(e->xpValue()));
                     }
                     break;  // 单发子弹只结算一个敌人
                 }
+            }
+        }
+
+        // T8：敌方弹体 × 玩家命中结算（喷吐者弹：EnemySide 阵营；命中玩家直接结算伤害）。
+        //     玩家侧无敌帧与击退在 Player::takeDamage 内统一处理——弹速 180 可走位躲开
+        for (const auto& p : projectiles_) {
+            if (!p->alive() || p->faction() != Projectile::Faction::EnemySide) continue;
+            if (collision::circlesOverlap(p->pos(), p->radius(),
+                                          player_.pos(), player_.radius())) {
+                player_.takeDamage(p->damage(), p->pos());
+                p->markDead();
             }
         }
 
@@ -186,7 +204,7 @@ void GameEngine::resolveUpgradeChoice(int idx) {
     if (idx < 0 || idx >= static_cast<int>(choices_.size())) return;
     const Affix chosen = choices_[idx];
 
-    GameContext ctx{&enemies_, &projectiles_, &player_, &xpOrbs_};
+    GameContext ctx{&enemies_, &projectiles_, &player_, &xpOrbs_, &spawner_};
     upgrade_.applyChoice(chosen, ctx);  // 属性类 → 修改 Stats；装备类 → 占位补偿属性
 
     // 装备类占位提示：选择后屏幕中央显示 3 秒（字体不可用回退英文）
@@ -232,8 +250,11 @@ void GameEngine::draw() {
             HudSnapshot snap;
             snap.player = &player_;
             snap.enemyCount = static_cast<int>(enemies_.size());
-            snap.wave = wave_;
-            snap.waveTimer = waveTimer_;
+            snap.wave = waveManager_.wave();               // T8：当前波号（WAITING 即下一波）
+            snap.waveState = static_cast<int>(waveManager_.state());  // 0 倒计时 / 1 刷怪 / 2 战斗
+            snap.restTimeLeft = waveManager_.restTimeLeft();
+            snap.remainingToSpawn = waveManager_.remainingToSpawn();
+            snap.aliveInWave = waveManager_.aliveLeft();
             snap.killCount = killCount_;
             snap.level = upgrade_.level();                    // T7：等级/经验改由 UpgradeSystem 提供
             snap.exp = upgrade_.expInLevel();
@@ -241,7 +262,7 @@ void GameEngine::draw() {
             ui_.drawHUD(snap);
 
             // 操作提示：屏幕左下角（T6 起改走中文字体，避免默认字体乱码）
-            ui_.drawText("WASD / 方向键 移动     F1 刷怪     Esc 退出",
+            ui_.drawText("WASD / 方向键 移动     F1 调试刷怪     Esc 退出",
                          20.0f, constants::window::kLogicHeight - 36.0f,
                          16, LIGHTGRAY);
             // T7：装备占位提示（选择到装备类词条后屏幕中央显示 3 秒）

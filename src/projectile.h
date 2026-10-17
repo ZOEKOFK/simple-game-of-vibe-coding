@@ -10,9 +10,11 @@ class Projectile {
 public:
     enum class Faction { PlayerSide, EnemySide };  // 阵营标志：区分敌我子弹
 
-    // pos 起点；dir 须为单位方向；speed 弹速；maxRange 最大射程（超出自动失效）
+    // pos 起点；dir 须为单位方向；speed 弹速；maxRange 最大射程（超出自动失效）；
+    // faction 阵营：T8 起敌方弹体传 EnemySide（喷吐者弹），默认玩家弹
     Projectile(const Vector2& pos, const Vector2& dir, float speed,
-               float damage, float maxRange);
+               float damage, float maxRange,
+               Faction faction = Faction::PlayerSide);
 
     void update(float dt);   // 飞行 + 射程衰减 + 出界失效
     void draw() const;       // 黄色小圆（T4 玩家弹表现）

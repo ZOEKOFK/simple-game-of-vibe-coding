@@ -36,3 +36,10 @@ bool Enemy::takeDamage(float amount) {
     }
     return isDead_;
 }
+
+void Enemy::scaleHp(float multiplier) {
+    // T8：波次生命倍率（docs/03 4.4：1 + 0.25×(n-1)）；出生时由 EnemySpawner 调用，
+    // 只按当前满血缩放——必须在首次受伤前调用，不破坏进行中战斗状态
+    maxHp_ *= multiplier;
+    hp_ = maxHp_;
+}
