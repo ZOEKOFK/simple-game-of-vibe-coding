@@ -10,6 +10,8 @@
 // T6：HUD（等级/经验条/血条/波次占位/敌人/击杀/武器说明，屏幕空间绘制）。
 // T7：经验吸取→升级三选一（UPGRADE 状态世界静止）→词条应用；Stats 全联动；每秒生命回复。
 // T8：波次系统（WaveManager 状态机接管刷怪）+ 喷吐者/蛮牛差异化 AI + 敌弹伤玩家。
+// T10：完整流程闭环——主菜单开局/暂停/死亡结算/重开；resetGame 全量重置；
+//      Esc 由"退出窗口"改为"暂停切换"；数字键 1~5 状态切换调试壳移除。
 // ============================================================
 #include <memory>
 #include <string>
@@ -57,6 +59,7 @@ public:
 private:
     void resolveUpgradeChoice(int idx);              // T7：应用三选一第 idx 项并决定去向
     Vector2 toLogicCoords(Vector2 winPos) const;     // T7：窗口坐标 → 逻辑坐标（鼠标判定用）
+    int  handleMenuInput(int itemCount);             // T10：通用菜单键盘/鼠标输入，返回确认项索引（-1 未确认）
 
     GameState state_ = GameState::MAIN_MENU;
     float accumulator_ = 0.0f;    // 固定步长累积器（秒）
@@ -68,7 +71,7 @@ private:
     std::vector<std::unique_ptr<Projectile>> projectiles_{};  // 场上子弹容器（T4）
     std::vector<XPOrb> xpOrbs_{};   // 场上经验点（T5：击杀掉落视觉反馈；吸取 T7）
 
-    UIManager ui_{};         // 进行中游戏 HUD（T6）+ 升级三选一（T7）
+    UIManager ui_{};         // 进行中游戏 HUD（T6）+ 升级三选一（T7）+ 菜单/结算（T10）
     UpgradeSystem upgrade_{};  // T7：经验/等级/词条抽取与应用
     WaveManager waveManager_{};  // T8：波次状态机（WAITING→SPAWNING→FIGHTING）
     int hitCount_ = 0;      // T4 调试计数：子弹命中敌人次数
@@ -79,6 +82,11 @@ private:
     std::string noticeText_{};      // T7：装备占位选择后提示文案
     float noticeTimer_ = 0.0f;      // T7：提示剩余显示时间（秒）
     float regenTimer_ = 0.0f;       // T7：每秒生命回复结算计数器
+
+    int   menuCursor_ = 0;      // T10：当前菜单选中项（主菜单/暂停/结算共用）
+    float survivalTime_ = 0.0f; // T10：本局存活时长（秒，PLAYING 累计，结算展示）
+    bool  exitRequested_ = false; // T10：请求退出（菜单"退出"触发；主循环据此终止避免关闭后绘制）
+    EndScreenStats endStats_{}; // T10：死亡瞬间汇总的本局统计（结算界面只读展示）
 
     Rectangle hudDest_{0.0f, 0.0f, 1280.0f, 720.0f}; // T7：渲染目标在窗口的映射（draw 每帧更新）
     float hudScale_ = 1.0f;         // T7：等比缩放系数（鼠标坐标逆变换用）

@@ -1,4 +1,3 @@
-// ============================================================
 // game.cpp —— GameEngine 实现
 // T1：窗口初始化、固定时间步主循环（accumulator 模式）、五状态空壳切换。
 // T2：PLAYING 状态接入 八方向输入→Player 移动、摄像机跟随与竞技场绘制。
@@ -8,6 +7,8 @@
 // T6：HUD（等级/经验条/血条/波次占位/敌人/击杀/武器说明）+ 中文字体加载。
 // T7：经验吸取→升级三选一（UPGRADE 世界静止）→词条应用；Stats 全联动；每秒生命回复。
 // T8：波次系统（WaveManager 状态机接管刷怪）+ 喷吐者/蛮牛差异化 AI + 敌弹伤玩家。
+// T10：完整流程闭环——主菜单开局（Enter/点击）/Esc 暂停/HP 归零结算/重开重置；
+//      resetGame 统一重置；数字键 1~5 状态切换与 Esc 退出（T1 空壳）正式移除。
 // ============================================================
 #include "game.h"
 
@@ -19,19 +20,6 @@
 #include "constants.h"
 
 namespace {
-
-// 状态名对照表（空壳阶段用于屏幕提示，便于人工验收状态切换）
-constexpr const char* kStateNames[] = {
-    "主菜单 MAIN_MENU",
-    "游戏进行中 PLAYING",
-    "已暂停 PAUSED",
-    "升级选择 UPGRADE",
-    "游戏结束 GAME_OVER",
-};
-
-const char* stateName(GameEngine::GameState s) {
-    return kStateNames[static_cast<int>(s)];
-}
 
 // 汇集八方向输入：WASD + 方向键（返回未归一化方向，归一化由 Player 负责）
 Vector2 readMoveInput() {
@@ -48,24 +36,65 @@ Vector2 readMoveInput() {
 void GameEngine::changeState(GameState next) { state_ = next; }
 
 void GameEngine::update(float dt) {
-    // 【T1 验收要求】Esc 键退出窗口（保留）
-    if (IsKeyPressed(KEY_ESCAPE)) {
-        CloseWindow();
+    // 【T10 流程改造】Esc 不再退出窗口：PLAYING/PAUSED 间切换暂停；
+    // 退出走 主菜单/暂停菜单 的"退出游戏"项（关闭窗口在 run() 主循环安全收尾）。
+    // T1 空壳的"数字键 1~5 切换状态"调试行为正式移除（真实流程已接管）。
+
+    if (state_ == GameState::MAIN_MENU) {
+        // 开始游戏 → 全量重置开新局；退出游戏 → 请求关闭窗口
+        const int sel = handleMenuInput(2);
+        if (sel == 0) {
+            resetGame();
+            changeState(GameState::PLAYING);
+        } else if (sel == 1) {
+            exitRequested_ = true;
+        }
         return;
     }
 
-    // 数字键 1~5 切换状态：仅用于验收"五状态空壳"，后续任务替换为真实触发条件（保留）。
-    // T7 例外：UPGRADE 状态下 1/2/3 是选项快捷键，不参与状态切换
-    if (state_ != GameState::UPGRADE) {
-        if (IsKeyPressed(KEY_ONE)) changeState(GameState::MAIN_MENU);
-        if (IsKeyPressed(KEY_TWO)) changeState(GameState::PLAYING);
-        if (IsKeyPressed(KEY_THREE)) changeState(GameState::PAUSED);
-        if (IsKeyPressed(KEY_FOUR)) changeState(GameState::UPGRADE);
-        if (IsKeyPressed(KEY_FIVE)) changeState(GameState::GAME_OVER);
+    if (state_ == GameState::PAUSED) {
+        // Esc 继续；或菜单选择：继续 / 返回主菜单 / 退出
+        if (IsKeyPressed(KEY_ESCAPE)) {
+            changeState(GameState::PLAYING);
+            return;
+        }
+        const int sel = handleMenuInput(3);
+        if (sel == 0) {
+            changeState(GameState::PLAYING);
+        } else if (sel == 1) {
+            menuCursor_ = 0;  // 回主菜单：光标回到"开始游戏"
+            changeState(GameState::MAIN_MENU);
+        } else if (sel == 2) {
+            exitRequested_ = true;
+        }
+        return;
+    }
+
+    if (state_ == GameState::GAME_OVER) {
+        // 重新开始 → 直接开新局；返回主菜单
+        const int sel = handleMenuInput(2);
+        if (sel == 0) {
+            resetGame();
+            changeState(GameState::PLAYING);
+        } else if (sel == 1) {
+            menuCursor_ = 0;  // 回主菜单：光标回到"开始游戏"
+            changeState(GameState::MAIN_MENU);
+        }
+        return;
     }
 
     // T2：仅 PLAYING 状态响应移动（在固定步长内更新，逻辑与帧率解耦）
     if (state_ == GameState::PLAYING) {
+        // Esc 切换暂停（画面冻结由 PAUSED 分支 + draw 压暗实现）
+        if (IsKeyPressed(KEY_ESCAPE)) {
+            menuCursor_ = 0;  // 进入暂停菜单：光标默认停在"继续游戏"
+            changeState(GameState::PAUSED);
+            return;
+        }
+
+        // T10：存活时长累计（结算界面展示）
+        survivalTime_ += dt;
+
         player_.update(dt, readMoveInput());
         ui_.update(dt, player_);  // T6：血条显示值平滑趋近实际 HP
 
@@ -179,8 +208,16 @@ void GameEngine::update(float dt) {
         // T7：装备占位提示倒计时
         if (noticeTimer_ > 0.0f) noticeTimer_ -= dt;
 
-        // T7：经验攒满升级请求 → 抽三选一并切入 UPGRADE（世界暂停静止）
-        if (upgrade_.hasPendingUpgrades()) {
+        // T10：HP 归零 → 汇总本局统计并切 GAME_OVER（须在升级判定前：死亡优先于升级）
+        if (player_.hp() <= 0) {
+            endStats_.wavesSurvived = waveManager_.wave() - 1;  // 已完成波数 = 当前波号-1
+            endStats_.killCount = killCount_;
+            endStats_.level = upgrade_.level();
+            endStats_.elapsedSec = survivalTime_;
+            menuCursor_ = 0;
+            changeState(GameState::GAME_OVER);
+        } else if (upgrade_.hasPendingUpgrades()) {
+            // T7：经验攒满升级请求 → 抽三选一并切入 UPGRADE（世界暂停静止）
             choices_ = upgrade_.drawChoices(3, ctx);
             hoveredCard_ = -1;
             changeState(GameState::UPGRADE);
@@ -252,9 +289,12 @@ void GameEngine::draw() {
     // 第 1 步：把画面绘制到 1280x720 逻辑分辨率的渲染目标
     BeginTextureMode(renderTex_);
     {
-        if (state_ == GameState::PLAYING || state_ == GameState::UPGRADE) {
+        // T10：世界+世界态（PLAYING 实时 / UPGRADE 定格 / PAUSED 冻结）共用绘制路径
+        if (state_ == GameState::PLAYING || state_ == GameState::UPGRADE ||
+            state_ == GameState::PAUSED) {
             // ---- T2：摄像机跟随 + 竞技场 + 玩家 ----
             // T7：UPGRADE 状态下世界照常绘制但不更新（敌我静止，画面定格）
+            // T10：PAUSED 同样只绘制不更新（冻结画面，叠压暗 + 暂停菜单）
             ClearBackground(constants::arena::kOutsideColor);  // 场外底色（近黑）
             camera_.target = player_.pos();  // 镜头跟随：玩家恒保持屏幕中心
             BeginMode2D(camera_);
@@ -283,20 +323,20 @@ void GameEngine::draw() {
             ui_.drawHUD(snap);
 
             // 操作提示：屏幕左下角（T6 起改走中文字体，避免默认字体乱码）
-            ui_.drawText("WASD / 方向键 移动     F1 调试刷怪     Esc 退出",
+            // T10：Esc 语义由"退出"改为"暂停"（退出走菜单项）
+            ui_.drawText("WASD / 方向键 移动     F1 调试刷怪     Esc 暂停",
                          20.0f, constants::window::kLogicHeight - 36.0f,
                          16, LIGHTGRAY);
             // T7：装备占位提示（选择到装备类词条后屏幕中央显示 3 秒）
             if (noticeTimer_ > 0.0f) {
                 ui_.drawCenterNotice(noticeText_.c_str(), 120.0f, 20, WHITE);
             }
-            // T5 临时处理：HP 归零仅锁定为 0 并中央提示，正式死亡/结算流程 T10 实现
-            if (player_.hp() <= 0) {
-                // 字体不可用时回退英文文案（默认字体无 CJK 字形，防乱码）
-                ui_.drawCenterNotice(ui_.cnFontAvailable()
-                                         ? "（死亡逻辑将在后续任务实现）"
-                                         : "(Death logic to be implemented in later tasks)",
-                                     0.0f, 28, RED);
+            // T10：PAUSED 压暗冻结画面 + 暂停菜单（继续/返回主菜单/退出）
+            if (state_ == GameState::PAUSED) {
+                DrawRectangle(0, 0, constants::window::kLogicWidth,
+                              constants::window::kLogicHeight,
+                              constants::ui::kDimOverlay);
+                ui_.drawPauseMenu(menuCursor_);
             }
             // T7：UPGRADE 遮罩压暗静止世界 + 三选一卡片
             if (state_ == GameState::UPGRADE) {
@@ -306,10 +346,13 @@ void GameEngine::draw() {
                 ui_.drawUpgradeChoices(choices_, hoveredCard_, &player_);
             }
         } else {
-            // ---- T1 空壳展示（保留）：黑底 + 当前状态名 ----
-            ClearBackground(BLACK);  // 验收预期：黑色窗口
-            DrawText(stateName(state_), 40, 40, 28, WHITE);
-            DrawText("Esc 退出 | 数字键 1~5 切换状态", 40, 80, 20, LIGHTGRAY);
+            // ---- T10：主菜单 / 死亡结算（黑底整屏界面）----
+            ClearBackground(BLACK);
+            if (state_ == GameState::MAIN_MENU) {
+                ui_.drawMainMenu(menuCursor_);
+            } else {  // GAME_OVER：本局统计 + 重新开始/返回主菜单
+                ui_.drawGameOverScreen(endStats_, menuCursor_);
+            }
         }
     }
     EndTextureMode();
@@ -366,8 +409,9 @@ void GameEngine::run() {
 
     // ---- 固定时间步长主循环（accumulator 模式）----
     // 逻辑更新恒以 1/60s 步进，与显示帧率解耦，保证不同帧率下逻辑一致。
+    // T10：菜单"退出游戏"置 exitRequested_，主循环在此收尾（此时状态仍可安全绘制）
     float prevTime = static_cast<float>(GetTime());
-    while (!WindowShouldClose()) {
+    while (!WindowShouldClose() && !exitRequested_) {
         const float now = static_cast<float>(GetTime());
         float frameTime = now - prevTime;
         prevTime = now;
@@ -388,5 +432,54 @@ void GameEngine::run() {
 }
 
 void GameEngine::resetGame() {
-    // TODO(T10)：全量重置（开局/重开共用）
+    // T10：开局/重开统一全量重置——保证新局零残留（子弹/敌人/经验点/词条/波次账本全部清空）
+    player_.reset();            // 位置/满血/Stats/武器回到初始（手枪）
+    enemies_.clear();           // 清场旧敌人（防重开后残留攻击新局玩家）
+    projectiles_.clear();       // 清场旧子弹（玩家弹与敌弹一并清空，防残留穿透弹）
+    xpOrbs_.clear();            // 清场旧经验点
+    upgrade_.reset();           // 等级 1 / 经验 0 / 升级请求清空
+    waveManager_.reset();       // 波次账本复位：第 1 波、3s 休整倒计时、刷怪批次清零
+    // EnemySpawner 无内部状态（出生点按玩家位置即时计算），无需复位
+    ui_.resetHud();             // 血条平滑显示值复位（防旧局血量残影）
+    menuCursor_ = 0;            // 菜单光标回到第一项
+    survivalTime_ = 0.0f;       // 存活计时清零
+    hitCount_ = 0;              // T4 调试计数清零
+    killCount_ = 0;             // 击杀数清零
+    noticeTimer_ = 0.0f;        // 清除残留提示文案
+    noticeText_.clear();
+    regenTimer_ = 0.0f;         // 生命回复 tick 计数器清零
+    endStats_ = EndScreenStats{};  // 结算统计复位
+}
+
+int GameEngine::handleMenuInput(int itemCount) {
+    // T10：通用菜单输入——键盘方向键（上/下）移动光标，回车/空格确认；鼠标悬停高亮 + 左键确认。
+    // 返回被确认项的索引（0 起）；-1 表示本帧未确认（仅移动了光标）。
+    if (itemCount <= 0) return -1;
+
+    if (IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_W)) {
+        menuCursor_ = (menuCursor_ - 1 + itemCount) % itemCount;
+    }
+    if (IsKeyPressed(KEY_DOWN) || IsKeyPressed(KEY_S)) {
+        menuCursor_ = (menuCursor_ + 1) % itemCount;
+    }
+
+    // 鼠标：悬停即高亮；左键点击确认
+    if (hudScale_ > 0.0f) {
+        const Vector2 logic = toLogicCoords(GetMousePosition());
+        for (int i = 0; i < itemCount; ++i) {
+            if (CheckCollisionPointRec(logic, ui_.menuRowRect(i))) {
+                menuCursor_ = i;
+                break;
+            }
+        }
+        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+            const Vector2 logic2 = toLogicCoords(GetMousePosition());
+            for (int i = 0; i < itemCount; ++i) {
+                if (CheckCollisionPointRec(logic2, ui_.menuRowRect(i))) return i;
+            }
+        }
+    }
+
+    if (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE)) return menuCursor_;
+    return -1;
 }

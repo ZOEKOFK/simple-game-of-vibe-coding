@@ -15,6 +15,19 @@ Player::Player() {
     weapons_.push_back(std::make_unique<Pistol>(&stats_));
 }
 
+void Player::reset() {
+    // T10：重开局全量复位——位置/HP/朝向/击退/无敌帧/Stats/武器列表回到构造态
+    //（equip 词条/吸血/穿透/飞刃强化等全部随 Stats 重建清空，武器还原初始手枪）
+    pos_ = Vector2{constants::player::kStartX, constants::player::kStartY};
+    lastMoveDir_ = Vector2{1.0f, 0.0f};
+    hp_ = constants::player::kMaxHp;
+    stats_ = Stats{};
+    knockbackVel_ = Vector2{};
+    invincibleTimer_ = 0.0f;
+    weapons_.clear();
+    weapons_.push_back(std::make_unique<Pistol>(&stats_));
+}
+
 void Player::updateWeapons(float dt, GameContext& ctx) {
     // 逐武器驱动：索敌/冷却/开火逻辑封装在 Weapon 基类主流程中
     for (auto& w : weapons_) {

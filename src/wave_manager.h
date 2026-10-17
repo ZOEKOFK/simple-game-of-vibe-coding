@@ -15,6 +15,7 @@ public:
     enum class State { WAITING, SPAWNING, FIGHTING };
 
     void update(float dt, GameContext& ctx);  // 状态推进；SPAWNING 经 ctx.spawner 委托生成
+    void reset();                             // T10：新局复位（第 1 波/3s 休整/账本清零）
     void startNextWave();                     // WAITING 倒计时结束 → SPAWNING（不供外部直接调用）
     void notifyEnemyDied();                   // 本波存活账本递减（清场判定；F1 调试怪同样记账）
 

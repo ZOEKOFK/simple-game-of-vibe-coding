@@ -15,6 +15,7 @@ struct GameContext;
 class UpgradeSystem {
 public:
     void addExp(int amount, GameContext& ctx);  // 经验入账；溢出保留，攒满 1 级登记 1 次升级请求
+    void reset();                               // T10：新局复位（等级 1/经验 0/升级请求与展示历史清空）
 
     int level() const;                          // 当前等级
     int expInLevel() const;                     // 当前等级内经验

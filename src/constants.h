@@ -208,11 +208,14 @@ namespace ui {
 constexpr const char* kFontPathYaHei  = "C:/Windows/Fonts/msyh.ttc";   // 中文字体：微软雅黑
 constexpr const char* kFontPathSimHei = "C:/Windows/Fonts/simhei.ttf"; // 回退字体：黑体
 // 中文字符集（供字体图集加载；后续任务新增 UI 文案时需在此追加对应汉字）
+// T10 追加：主菜单/暂停/结算界面文案（开始游戏 竞技场幸存者 主菜单 统计 结束 操作说明 等）
 constexpr const char* kCnCharSet =
     "第波剩余时间敌人击杀手枪自动射击死亡逻辑将在后续任务实现方向键移动刷怪退出·（）"
     "选择升级按或鼠标点击普通稀有史诗伤害强化攻健生命上限并回复高磁力拾取半径每秒"
     "受伤获得暂补偿霰环绕飞刃单已取本次再韧性急促跑武器「」下中一"
-    "吸血神铁巨人甲弹穿透发散速子扇形：，";
+    "吸血神铁巨人甲弹穿透发散速子扇形：，"
+    "开始游戏退出主菜单竞技场幸存者停继续重新返回本局统计结束你倒下等级活长分秒"
+    "操作说明按回车确认总";
 constexpr int   kFontBaseSize  = 32;   // 字体图集基准字号（px），绘制时按需缩放
 constexpr int   kHudMargin     = 16;   // HUD 距屏幕边缘边距（px）
 constexpr int   kExpBarWidth   = 260;  // 经验条宽（px）
@@ -239,6 +242,19 @@ constexpr Color kCardTextCommon {225, 225, 225, 255};// 普通文字（近白）
 constexpr Color kCardTextRare   {130, 175, 255, 255};// 稀有文字（亮蓝）
 constexpr Color kCardTextEpic   {205, 140, 255, 255};// 史诗文字（亮紫）
 constexpr Color kCardHoverBorder{250, 200, 60, 255}; // 悬停卡片描边（亮黄）
+
+// ---- T10 通用菜单（主菜单/暂停/结算共用行式布局；键盘方向键+回车 / 鼠标点击）----
+constexpr int   kMenuRowWidth  = 460;   // 菜单项行宽（水平居中列）
+constexpr int   kMenuRowHeight = 58;    // 菜单项行高
+constexpr int   kMenuRowGap    = 16;    // 菜单项行间距
+constexpr float kMenuStartY    = 420.0f; // 第一项行顶 Y（逻辑坐标，位于标题下方）
+constexpr Color kMenuTitleColor  {255, 210, 90, 255};   // 大标题（金）
+constexpr Color kMenuSubColor    {150, 160, 175, 255};  // 副标题/说明文字（灰蓝）
+constexpr Color kMenuBgNormal    {46, 52, 64, 255};     // 未选中项底色
+constexpr Color kMenuBgHover     {92, 112, 168, 255};   // 选中项底色（高亮蓝）
+constexpr Color kMenuBgHoverEdge {255, 220, 120, 255};  // 选中项描边（金）
+constexpr Color kMenuTextColor   {232, 232, 232, 255};  // 菜单项文字（近白）
+constexpr Color kGameOverRed     {255, 96, 72, 255};    // 结算标题（红）
 }  // namespace ui
 
 }  // namespace constants

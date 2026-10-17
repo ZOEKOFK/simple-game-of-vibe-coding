@@ -17,6 +17,7 @@ struct GameContext;  // 前向声明（定义在 game.h），武器驱动经此�
 class Player {
 public:
     Player();                                       // 开局自带初始武器（手枪）
+    void reset();                                   // T10：全量重置（开局/重开共用，与构造等价）
 
     // ---- 行为接口 ----
     void update(float dt, Vector2 inputDir);       // T2：移动 + 无敌帧/击退衰减

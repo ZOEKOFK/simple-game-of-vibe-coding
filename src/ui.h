@@ -29,6 +29,14 @@ struct HudSnapshot {
     float expToNext = 1.0f;          // 升下一级所需经验（docs/03 4.5 公式）
 };
 
+// T10 结算统计：死亡/重开瞬间由 GameEngine 汇总传入，UI 只读展示
+struct EndScreenStats {
+    int   wavesSurvived = 0;   // 存活波次（已完成波数 = 当前波号 - 1）
+    int   killCount = 0;       // 总击杀
+    int   level = 1;           // 最终等级
+    float elapsedSec = 0.0f;   // 存活时长（秒）
+};
+
 class UIManager {
 public:
     UIManager() = default;
@@ -42,6 +50,13 @@ public:
 
     void update(float dt, const Player& player);   // 血条显示值平滑趋近（防跳变）
     void drawHUD(const HudSnapshot& s) const;      // PLAYING 状态 HUD（屏幕空间）
+    void resetHud();                               // T10：重开局血条平滑值复位（防残留旧值）
+
+    // ---- T10 菜单界面（主菜单/暂停/结算；行式布局 + 键盘/鼠标）----
+    Rectangle menuRowRect(int index) const;        // 第 index 行菜单项区（逻辑坐标，供鼠标判定）
+    void drawMainMenu(int cursor) const;           // 标题 + 开始/退出
+    void drawPauseMenu(int cursor) const;          // 已暂停 + 继续/回主菜单/退出
+    void drawGameOverScreen(const EndScreenStats& s, int cursor) const;  // 统计 + 重开/回主菜单
 
     // ---- T7 升级三选一（UPGRADE 状态；遮罩由 GameEngine 绘制）----
     Rectangle upgradeCardRect(int index) const;    // 第 index(0~2) 张卡片区（逻辑坐标，供鼠标判定）
@@ -62,4 +77,6 @@ private:
     Vector2 measureText(const char* text, float size) const;
     void drawTextAligned(const char* text, float x, float y, float size,
                          Color color, int align) const;  // align: 0 左 / 1 中 / 2 右
+    // T10：绘制一组居中菜单项（选中行高亮描边），布局与 menuRowRect 同源
+    void drawMenuRows(const std::vector<std::string>& items, int cursor) const;
 };

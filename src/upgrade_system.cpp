@@ -33,6 +33,14 @@ Rarity rollRarity() {
 int UpgradeSystem::level() const { return level_; }
 int UpgradeSystem::expInLevel() const { return exp_; }
 
+void UpgradeSystem::reset() {
+    // T10：重开局复位——等级/经验/升级请求与展示历史全部回到初始（词条效果随 Player::reset 清空）
+    level_ = 1;
+    exp_ = 0;
+    pendingUpgrades_ = 0;
+    lastShown_.clear();
+}
+
 void UpgradeSystem::addExp(int amount, GameContext& ctx) {
     (void)ctx;  // T7 无需外部协作；保留签名与设计文档接口一致（docs/03 2.6）
     if (amount <= 0) return;

@@ -22,6 +22,17 @@ float WaveManager::restTimeLeft() const { return restTimer_; }
 int   WaveManager::remainingToSpawn() const { return spawnBatchLeft_; }
 int   WaveManager::aliveLeft() const { return aliveLeft_; }
 
+void WaveManager::reset() {
+    // T10：重开局复位——第 1 波、3s 休整倒计时、刷怪批次与存活账本/蛮牛计数全部清零
+    state_ = State::WAITING;
+    wave_ = 1;
+    restTimer_ = constants::wave::kRestTime;
+    spawnBatchLeft_ = 0;
+    batchTimer_ = 0.0f;
+    aliveLeft_ = 0;
+    brutesSpawned_ = 0;
+}
+
 int WaveManager::totalCountForWave(int n) const {
     return constants::wave::kBaseCount + constants::wave::kCountPerWave * (n - 1);
 }

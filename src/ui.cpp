@@ -116,6 +116,11 @@ void UIManager::update(float dt, const Player& player) {
     displayHp_ += (target - displayHp_) * t;
 }
 
+void UIManager::resetHud() {
+    // T10：重开局把平滑血条值复位为"未初始化"，下一帧自动对齐新局实际 HP
+    displayHp_ = -1.0f;
+}
+
 void UIManager::drawHUD(const HudSnapshot& s) const {
     const int m = constants::ui::kHudMargin;  // 边缘边距
     const int W = constants::window::kLogicWidth;
@@ -208,6 +213,123 @@ void UIManager::drawHUD(const HudSnapshot& s) const {
                         constants::window::kLogicHeight - m - 26.0f, 20,
                         constants::ui::kTextMainColor, 1);
     }
+}
+
+// ============================================================
+// T10：菜单界面（主菜单 / 暂停 / 结算）——行式布局，键盘方向键+回车 / 鼠标点击
+// 布局唯一来源 menuRowRect：绘制与 GameEngine 鼠标命中判定共用，保证零错位
+// ============================================================
+
+Rectangle UIManager::menuRowRect(int index) const {
+    const float x = (constants::window::kLogicWidth - constants::ui::kMenuRowWidth) * 0.5f;
+    const float y = constants::ui::kMenuStartY +
+                    static_cast<float>(index) *
+                        (constants::ui::kMenuRowHeight + constants::ui::kMenuRowGap);
+    return Rectangle{x, y, static_cast<float>(constants::ui::kMenuRowWidth),
+                     static_cast<float>(constants::ui::kMenuRowHeight)};
+}
+
+void UIManager::drawMenuRows(const std::vector<std::string>& items, int cursor) const {
+    for (size_t i = 0; i < items.size(); ++i) {
+        const Rectangle r = menuRowRect(static_cast<int>(i));
+        const bool sel = static_cast<int>(i) == cursor;
+        // 底：未选中深灰 / 选中高亮蓝 + 金描边（与升级卡片一致的圆角风格）
+        DrawRectangleRounded(r, 0.10f, 10, sel ? constants::ui::kMenuBgHover
+                                               : constants::ui::kMenuBgNormal);
+        if (sel) DrawRectangleLinesEx(r, 2.0f, constants::ui::kMenuBgHoverEdge);
+        drawTextAligned(items[i].c_str(), r.x + r.width * 0.5f,
+                        r.y + (r.height - 26.0f) * 0.5f, 26, constants::ui::kMenuTextColor, 1);
+    }
+}
+
+void UIManager::drawMainMenu(int cursor) const {
+    const float cx = constants::window::kLogicWidth * 0.5f;
+
+    // 标题：中文大标题 + 英文副标题（字体不可用整屏回退英文）
+    drawTextAligned(fontValid_ ? "竞技场幸存者" : "ARENA SURVIVOR",
+                    cx, 150.0f, 64, constants::ui::kMenuTitleColor, 1);
+    if (fontValid_) {
+        drawTextAligned("Arena Survivor", cx, 235.0f, 22, constants::ui::kMenuSubColor, 1);
+    }
+
+    // 菜单项：开始 / 退出
+    std::vector<std::string> items;
+    items.push_back(fontValid_ ? "开始游戏" : "Start Game");
+    items.push_back(fontValid_ ? "退出游戏" : "Quit");
+    drawMenuRows(items, cursor);
+
+    // 底部操作说明
+    drawTextAligned(fontValid_
+                        ? "操作说明：WASD / 方向键 移动    武器自动射击    Esc 暂停"
+                        : "WASD/Arrows move   Auto-fire   Esc pause",
+                    cx, constants::window::kLogicHeight - 120.0f, 18,
+                    constants::ui::kMenuSubColor, 1);
+    drawTextAligned(fontValid_ ? "方向键 选择    回车 / 点击 确认"
+                               : "Arrows select   Enter / Click confirm",
+                    cx, constants::window::kLogicHeight - 88.0f, 18,
+                    constants::ui::kMenuSubColor, 1);
+}
+
+void UIManager::drawPauseMenu(int cursor) const {
+    const float cx = constants::window::kLogicWidth * 0.5f;
+    // 引擎已先压暗冻结画面，这里只画"已暂停"标题与三项选择
+    drawTextAligned(fontValid_ ? "已暂停" : "PAUSED",
+                    cx, 300.0f, 48, constants::ui::kMenuTitleColor, 1);
+
+    std::vector<std::string> items;
+    items.push_back(fontValid_ ? "继续游戏" : "Resume");
+    items.push_back(fontValid_ ? "返回主菜单" : "Main Menu");
+    items.push_back(fontValid_ ? "退出游戏" : "Quit");
+    drawMenuRows(items, cursor);
+
+    drawTextAligned(fontValid_ ? "方向键 选择    回车 确认    Esc 继续"
+                               : "Arrows select   Enter confirm   Esc resume",
+                    cx, constants::window::kLogicHeight - 88.0f, 18,
+                    constants::ui::kMenuSubColor, 1);
+}
+
+void UIManager::drawGameOverScreen(const EndScreenStats& s, int cursor) const {
+    const float cx = constants::window::kLogicWidth * 0.5f;
+
+    // 标题与副标题
+    drawTextAligned(fontValid_ ? "游戏结束" : "GAME OVER",
+                    cx, 110.0f, 60, constants::ui::kGameOverRed, 1);
+    if (fontValid_) {
+        drawTextAligned("你倒下了", cx, 185.0f, 24, constants::ui::kMenuSubColor, 1);
+    }
+
+    // 本局统计：存活波次 / 总击杀 / 等级 / 存活时长（≥60s 显示 X 分 Y 秒）
+    const int mins = static_cast<int>(s.elapsedSec / 60.0f);
+    const int secs = static_cast<int>(s.elapsedSec) % 60;
+    std::vector<std::string> lines;
+    if (fontValid_) {
+        lines.push_back("存活波次：" + std::to_string(s.wavesSurvived));
+        lines.push_back("总击杀：" + std::to_string(s.killCount));
+        lines.push_back("等级：" + std::to_string(s.level));
+        lines.push_back("存活时长：" + std::to_string(mins) + "分" +
+                        std::to_string(secs) + "秒");
+    } else {
+        lines.push_back("Waves: " + std::to_string(s.wavesSurvived));
+        lines.push_back("Kills: " + std::to_string(s.killCount));
+        lines.push_back("Level: " + std::to_string(s.level));
+        lines.push_back("Time: " + std::to_string(mins) + "m " + std::to_string(secs) + "s");
+    }
+    float ly = 250.0f;
+    for (const auto& line : lines) {
+        drawTextAligned(line.c_str(), cx, ly, 22, constants::ui::kTextMainColor, 1);
+        ly += 38.0f;
+    }
+
+    // 菜单项：重新开始 / 返回主菜单
+    std::vector<std::string> items;
+    items.push_back(fontValid_ ? "重新开始" : "Restart");
+    items.push_back(fontValid_ ? "返回主菜单" : "Main Menu");
+    drawMenuRows(items, cursor);
+
+    drawTextAligned(fontValid_ ? "方向键 选择    回车 / 点击 确认"
+                               : "Arrows select   Enter / Click confirm",
+                    cx, constants::window::kLogicHeight - 88.0f, 18,
+                    constants::ui::kMenuSubColor, 1);
 }
 
 // ============================================================
