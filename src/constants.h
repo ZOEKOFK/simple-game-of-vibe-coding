@@ -28,6 +28,10 @@ constexpr float kRadius    = 14.0f;   // 碰撞半径（px）
 constexpr float kMoveSpeed = 220.0f;  // 基础移速（px/s），实际移速 = 基础移速 × Stats 移速倍率
 constexpr float kStartX    = 1600.0f; // 出生点 X（场地中心）
 constexpr float kStartY    = 900.0f;  // 出生点 Y（场地中心）
+constexpr float kMaxHp     = 100.0f;  // 最大生命（docs/03 4.1）
+constexpr float kInvincibleDuration = 0.6f;   // 受击无敌帧（秒）：> 敌人攻击冷却一半，防围殴连续掉血
+constexpr float kKnockbackForce      = 240.0f; // 受击击退初速（px/s），总位移 ≈ 初速/衰减系数 = 24px
+constexpr float kKnockbackDecay      = 10.0f;  // 击退速度指数衰减系数（/s），形成"被拍开"手感
 }  // namespace player
 
 // ---- 竞技场（docs/03 4.8 数值基线）----
@@ -57,6 +61,11 @@ constexpr float kCrawlerRadius = 14.0f;   // 碰撞半径（与玩家同规格�
 constexpr float kSeparationRadius   = 30.0f;
 constexpr float kSeparationStrength = 0.6f;  // 分离力权重（相对追踪方向的力度，0~1）
 
+// 接触战斗数值（docs/03 4.3；T5 启用）
+constexpr float kCrawlerContactDamage  = 8.0f;  // 接触伤害（每击）
+constexpr float kCrawlerAttackCooldown = 0.8f;  // 接触攻击冷却（秒），避免每帧掉血
+constexpr int   kCrawlerXpValue        = 5;     // 击杀经验（T5 只作掉落展示，吸取 T7）
+
 // 生成规则（T3 调试用，正式波次 T8 接入）
 constexpr int   kDebugSpawnCount    = 10;     // F1 一次刷怪数量
 constexpr float kSpawnMinPlayerDist = 400.0f; // 出生点距玩家最小距离，防骑脸
@@ -83,5 +92,11 @@ constexpr float kBulletSpeed    = 600.0f;  // 弹速（px/s），方向在开火
 constexpr float kBulletMaxRange = 900.0f;  // 最大射程（px），超出自动消失
 constexpr Color kBulletColor    {255, 210, 60, 255};  // 黄色小圆
 }  // namespace projectile
+
+// ---- 经验点（T5：击杀掉落视觉反馈；拾取与吸取 T7）----
+namespace xp_orb {
+constexpr float kSize = 12.0f;  // 绿色小方块边长（px）
+constexpr Color kColor {60, 220, 120, 255};  // 绿色（与敌人红、子弹黄区分）
+}  // namespace xp_orb
 
 }  // namespace constants

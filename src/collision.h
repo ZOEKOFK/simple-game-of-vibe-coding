@@ -1,14 +1,15 @@
 #pragma once
 // ============================================================
-// collision.h —— CollisionSystem 碰撞系统
-// 方案：圆-圆检测 + 空间哈希网格分区（160×160 单元，3×3 邻域查询），
-//       避免 200 敌人 × 子弹 的 O(N×M) 全量遍历（详见 docs/03 §2.8）。
-// T1 仅声明；检测与伤害上报在 T5、空间哈希在 T11 实现。
+// collision.h —— 碰撞工具
+// T5：圆-圆相交检测工具函数（免开方）；
+// T11：空间哈希网格分区与邻域查询在此扩展（docs/03 2.8 渐进替换方案）。
 // ============================================================
-struct GameContext;
+#include "raylib.h"  // Vector2
 
-class CollisionSystem {
-public:
-    // T5：子弹-敌人 / 敌人-玩家 / 经验点-玩家 检测与上报
-    // T11：空间哈希网格构建与邻域查询
-};
+namespace collision {
+
+// 圆-圆相交判定：半径和平方 与 圆心距平方 比较（避免开方，docs/04 T5 要求）
+bool circlesOverlap(const Vector2& aPos, float aRadius,
+                    const Vector2& bPos, float bRadius);
+
+}  // namespace collision

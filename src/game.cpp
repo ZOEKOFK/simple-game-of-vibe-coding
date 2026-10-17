@@ -4,6 +4,7 @@
 // T2：PLAYING 状态接入 八方向输入→Player 移动、摄像机跟随与竞技场绘制。
 // T3：F1 调试刷怪 + 敌人追踪/分离 AI 更新与绘制、临调敌人数显示。
 // T4：武器自动索敌/开火、子弹飞行与命中判定（命中暂只移除子弹）、命中次数显示。
+// T5：伤害结算（命中扣血/击杀掉落经验点/接触受伤）、击退与无敌帧、HP 归零锁 0。
 // ============================================================
 #include "game.h"
 
@@ -11,6 +12,7 @@
 #include <string>
 
 #include "arena.h"
+#include "collision.h"  // T5：统一圆-圆检测
 #include "constants.h"
 
 namespace {
@@ -66,7 +68,7 @@ void GameEngine::update(float dt) {
             for (auto& e : batch) enemies_.push_back(std::move(e));
         }
 
-        GameContext ctx{&enemies_, &projectiles_};
+        GameContext ctx{&enemies_, &projectiles_, &player_, &xpOrbs_};
 
         // T3：敌人 AI 更新（追踪 + 分离 + 接触标记；伤害结算 T5）
         for (const auto& e : enemies_) {
@@ -81,24 +83,31 @@ void GameEngine::update(float dt) {
             p->update(dt);
         }
 
-        // T4：子弹×敌人命中判定——朴素双循环（实体量大后的优化在 T11 换空间哈希）；
-        //     命中暂只移除子弹并计数，伤害与击杀 T5 结算
+        // T5：子弹×敌人命中结算——朴素双循环（实体量大后的优化在 T11 换空间哈希）；
+        //     命中即单次伤害（穿透类武器后续扩展），击杀则掉落经验点（吸取 T7）
         for (const auto& p : projectiles_) {
             if (!p->alive()) continue;
             for (const auto& e : enemies_) {
-                if (!e) continue;
-                const float rr = p->radius() + e->radius();
-                const float dx = p->pos().x - e->pos().x;
-                const float dy = p->pos().y - e->pos().y;
-                if (dx * dx + dy * dy <= rr * rr) {
-                    p->markDead();
+                if (!e || e->isDead()) continue;
+                if (collision::circlesOverlap(p->pos(), p->radius(),
+                                              e->pos(), e->radius())) {
+                    p->markDead();  // 命中子弹消失
                     ++hitCount_;
-                    break;
+                    if (e->takeDamage(p->damage())) {
+                        // 击杀：死亡位置掉落经验点（绿色小方块，视觉反馈）
+                        xpOrbs_.emplace_back(e->pos(),
+                                             static_cast<float>(e->xpValue()));
+                    }
+                    break;  // 单发子弹只结算一个敌人
                 }
             }
         }
 
-        // 移除已失效子弹（命中/超射程/出界）
+        // 移除已死亡敌人与已失效子弹（命中/超射程/出界）
+        enemies_.erase(
+            std::remove_if(enemies_.begin(), enemies_.end(),
+                           [](const auto& e) { return !e || e->isDead(); }),
+            enemies_.end());
         projectiles_.erase(
             std::remove_if(projectiles_.begin(), projectiles_.end(),
                            [](const auto& p) { return !p || !p->alive(); }),
@@ -119,6 +128,7 @@ void GameEngine::draw() {
                 drawArena();                                  // 地面/网格/围墙（世界坐标）
                 for (const auto& e : enemies_) e->draw();     // 敌人（世界坐标）
                 for (const auto& p : projectiles_) p->draw(); // 子弹（黄色小圆）
+                for (const auto& o : xpOrbs_) o.draw();       // 经验点（绿色小方块，T5）
                 player_.draw();                               // 玩家（世界坐标）
             }
             EndMode2D();
@@ -128,6 +138,16 @@ void GameEngine::draw() {
             DrawText(countText.c_str(), 20, 48, 20, GOLD);
             const std::string hitText = "命中次数: " + std::to_string(hitCount_);
             DrawText(hitText.c_str(), 20, 68, 20, YELLOW);
+            const std::string hpText = "玩家HP: " + std::to_string(player_.hp()) +
+                                       " / " + std::to_string(player_.maxHp());
+            DrawText(hpText.c_str(), 20, 96, 20, RED);
+            // T5 临时处理：HP 归零仅锁定为 0 并中央提示，正式死亡/结算流程 T10 实现
+            if (player_.hp() <= 0) {
+                const char* deadText = "（死亡逻辑将在后续任务实现）";
+                const int textW = MeasureText(deadText, 28);
+                DrawText(deadText, (constants::window::kLogicWidth - textW) / 2,
+                         constants::window::kLogicHeight / 2 - 14, 28, RED);
+            }
         } else {
             // ---- T1 空壳展示（保留）：黑底 + 当前状态名 ----
             ClearBackground(BLACK);  // 验收预期：黑色窗口

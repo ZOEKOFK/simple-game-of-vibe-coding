@@ -1,6 +1,7 @@
-// enemy_crawler.cpp —— 爬行者实现（T3：追踪 + 同族分离力 + 接触标记）
+// enemy_crawler.cpp —— 爬行者实现（T3：追踪+分离力+接触标记；T5：接触数值/统一碰撞判定）
 #include "enemy_crawler.h"
 
+#include "collision.h"  // T5：统一圆-圆检测
 #include "constants.h"
 #include "game.h"     // GameContext 完整定义（分离力需遍历敌人列表）
 #include "raymath.h"  // Vector2Length（raylib.h 未包含 raymath，需显式引入）
@@ -10,6 +11,9 @@ Crawler::Crawler(const Vector2& spawnPos) {
     radius_ = constants::enemy::kCrawlerRadius;
     hp_ = maxHp_ = constants::enemy::kCrawlerHp;
     moveSpeed_ = constants::enemy::kCrawlerSpeed;
+    contactDamage_ = constants::enemy::kCrawlerContactDamage;   // T5：接触伤害 8
+    attackInterval_ = constants::enemy::kCrawlerAttackCooldown; // T5：攻击冷却 0.8s
+    xpValue_ = constants::enemy::kCrawlerXpValue;               // T5：经验 5（击杀掉落）
 }
 
 void Crawler::decide(float dt, const Vector2& playerPos, GameContext& ctx) {
@@ -48,10 +52,13 @@ void Crawler::decide(float dt, const Vector2& playerPos, GameContext& ctx) {
     pos_.x += move.x * moveSpeed_ * dt;
     pos_.y += move.y * moveSpeed_ * dt;
     // 注意：此处不做竞技场钳制——敌人出生在墙外（开发者确认的入场方式），
-    // 直线追踪玩家翻越围墙入场；场外→场内过渡与通用边界约束在 T5 统一处理。
+    // 直线追踪玩家翻越围墙入场；通用边界约束在后续任务按需处理。
 
-    // 4) 接触标记：与玩家距离小于两半径和（伤害结算留 T5）
-    touchingPlayer_ = distToPlayer < (radius_ + constants::player::kRadius);
+    // 4) 接触标记：统一走 collision 圆-圆检测（免开方；接触伤害由基类主调结算）
+    touchingPlayer_ = ctx.player != nullptr &&
+                      collision::circlesOverlap(pos_, radius_,
+                                                ctx.player->pos(),
+                                                ctx.player->radius());
 }
 
 void Crawler::draw() const {

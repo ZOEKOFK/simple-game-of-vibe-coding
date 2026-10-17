@@ -3,8 +3,8 @@
 // enemy.h —— Enemy 抽象基类
 // 扩展点：新增敌种类只需继承并覆写 decide()（AI 决策）与 draw()（表现），
 //         基类统一维护公共状态与"非虚主调"框架（docs/03 2.4）。
-// T3 范围：状态字段、update 主调、接触标志与查询接口；
-//         伤害结算/死亡标记/攻击冷却（T5）与经验掉落（T5/T8）待实现。
+// T3：状态字段、update 主调、接触标志与查询接口；
+// T5：接触攻击冷却与伤害结算、takeDamage 扣血/死亡标记、经验掉落。
 // ============================================================
 #include "raylib.h"
 
@@ -14,10 +14,10 @@ class Enemy {
 public:
     virtual ~Enemy() = default;
 
-    // 非虚主调：重置接触标志 → 调用子类 AI 决策（每个定步长调用一次）
+    // 非虚主调：重置接触标志 → 维护攻击冷却 → 调用子类 AI 决策 → 接触伤害结算
     void update(float dt, const Vector2& playerPos, GameContext& ctx);
 
-    bool takeDamage(float amount);            // 扣血并返回是否死亡（T5 实现；本任务只保留接口）
+    bool takeDamage(float amount);            // T5：扣血并返回是否死亡（hp≤0 锁定 0 并置死亡标志）
     bool isDead() const;
     virtual void draw() const = 0;            // 子类自绘（如红色圆形，与玩家区分）
 
@@ -25,10 +25,9 @@ public:
     const Vector2& pos() const;
     float radius() const;
     float hp() const;
-    bool  touchingPlayer() const;             // 接触中标志（T3 标记，T5 用于伤害结算）
+    bool  touchingPlayer() const;             // 接触中标志（T3 标记，T5 用于接触伤害结算）
     float contactDamage() const;              // 接触伤害（近战/精英用，T5 启用）
-    bool  attackCooldownReady(float dt);      // 接触攻击冷却框架（T5 实现）
-    int   xpValue() const;                    // 死亡经验掉落（T5/T8）
+    int   xpValue() const;                    // 死亡经验掉落（T5 掉落展示，吸取 T7）
 
 protected:
     // 子类 AI 决策：每帧如何移动/如何标记接触
@@ -40,7 +39,10 @@ protected:
     float   hp_ = 0.0f;               // 当前生命
     float   maxHp_ = 0.0f;            // 最大生命
     float   moveSpeed_ = 0.0f;        // 移速（px/s）
-    float   contactDamage_ = 0.0f;    // 接触伤害
-    float   attackCooldown_ = 0.0f;   // 接触攻击冷却（秒）
+    float   contactDamage_ = 0.0f;    // 接触伤害（子类构造时按数值表设置）
+    float   attackCooldown_ = 0.0f;   // 接触攻击冷却剩余（秒，>0 表示冷却中）
+    float   attackInterval_ = 0.8f;   // 接触攻击间隔（秒，子类构造时按数值表设置）
+    int     xpValue_ = 0;             // 击杀经验掉落
+    bool    isDead_ = false;          // 死亡标志（hp≤0 置位，由 GameEngine 移除实体）
     bool    touchingPlayer_ = false;  // 接触中：与玩家距离 < 两半径和
 };

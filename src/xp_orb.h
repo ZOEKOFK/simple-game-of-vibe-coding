@@ -1,17 +1,22 @@
 #pragma once
 // ============================================================
-// xp_orb.h —— 经验点实体
-// 职责：掉落、停留、被玩家吸取（T5 掉落 / T7 吸取实现）。
+// xp_orb.h —— 经验点
+// T5：击杀敌人时掉落的经验点，暂仅作视觉反馈（绿色小方块）；
+//     拾取/吸取判定与升级结算 T7 接入。
 // ============================================================
 #include "raylib.h"
 
 class XPOrb {
 public:
-    // T5：void draw() const;                             自绘
-    // T7：void update(float dt, const Vector2& playerPos);  吸取判定
+    XPOrb(const Vector2& pos, float value);
+
+    void draw() const;               // 绿色小方块（临时视觉反馈）
+
+    // ---- 查询接口 ----
+    const Vector2& pos() const { return pos_; }  // T7 拾取判定用
+    float value() const { return value_; }        // 掉落经验值
 
 private:
-    Vector2 pos_{};        // 世界坐标
-    int     value_ = 5;    // 经验值（小怪 5 XP，精英倍率见 docs/03 数值表）
-    bool    alive_ = true; // 存活标志
+    Vector2 pos_{};      // 世界坐标（敌人死亡位置）
+    float   value_ = 0.0f;  // 经验值（爬行者 5，见 docs/03 4.3）
 };

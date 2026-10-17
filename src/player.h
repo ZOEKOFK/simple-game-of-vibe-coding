@@ -2,7 +2,7 @@
 // ============================================================
 // player.h —— 玩家
 // 职责：八方向移动、受击/无敌帧/击退，持有武器与 Stats。
-// T2 已实现移动与自绘；T4 持有初始手枪并逐帧驱动武器；受击 T5、装备词条 T7。
+// T2 移动与自绘；T4 初始手枪与武器驱动；T5 受击/无敌帧/击退；装备词条 T7。
 // ============================================================
 #include <memory>
 #include <vector>
@@ -38,7 +38,7 @@ private:
     Vector2 pos_{constants::player::kStartX,
                  constants::player::kStartY};  // 世界坐标（T2 出生点 = 场地中心）
     Vector2 lastMoveDir_{1.0f, 0.0f};          // 朝向 = 最后非零移动方向（朝向指示线用）
-    float   hp_ = 100.0f;           // 当前生命（基线见 docs/03 数值表，T2 收编入 constants.h）
+    float   hp_ = constants::player::kMaxHp;    // 当前生命（基线 100，docs/03 4.1；数值统一收编 constants.h）
     Stats   stats_{};               // 属性中心
     Vector2 knockbackVel_{};        // 击退速度（受击瞬间赋值，逐帧衰减）
     float   invincibleTimer_ = 0.0f;  // 无敌帧计时（>0 时不受伤）

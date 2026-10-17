@@ -4,6 +4,9 @@
 // 职责：游戏状态机 + 固定时间步主循环 + 子系统编排（后续任务逐步挂载）。
 // T1：窗口、固定步长主循环、五状态空壳切换。
 // T2：挂载 Player 与跟随摄像机（仅 PLAYING 生效，其余状态维持 T1 表现）。
+// T3：F1 调试刷怪 + 敌人 AI 更新与绘制。
+// T4：武器自动索敌/开火、子弹飞行与命中判定（命中暂只移除子弹）。
+// T5：伤害结算（子弹-敌人/敌人-玩家）、击杀移除、经验点掉落与玩家受击反馈。
 // ============================================================
 #include <memory>
 #include <vector>
@@ -13,6 +16,7 @@
 #include "enemy.h"          // 敌人容器需要完整类型
 #include "enemy_spawner.h"  // T3 调试刷怪
 #include "projectile.h"     // 子弹容器需要完整类型（T4）
+#include "xp_orb.h"         // 经验点容器需要完整类型（T5）
 
 // ------------------------------------------------------------
 // GameContext：各系统间的只读上下文总线（字段在后续任务补充）
@@ -23,7 +27,9 @@ struct GameContext {
     std::vector<std::unique_ptr<Enemy>>* enemies = nullptr;
     // T4：子弹容器指针（武器开火生成子弹的唯一落点，由 GameEngine 统一管理）
     std::vector<std::unique_ptr<Projectile>>* projectiles = nullptr;
-    // 预留：经验点容器 / 玩家引用（T5 补充）
+    // T5：玩家指针（敌人接触攻击经此结算伤害）与经验点容器（击杀掉落落点，吸取 T7）
+    Player* player = nullptr;
+    std::vector<XPOrb>* xpOrbs = nullptr;
 };
 
 class GameEngine {
@@ -48,5 +54,6 @@ private:
     std::vector<std::unique_ptr<Enemy>> enemies_{};  // 场上敌人容器（T3）
     EnemySpawner spawner_{};      // 敌人生成器（T3 F1 调试刷怪）
     std::vector<std::unique_ptr<Projectile>> projectiles_{};  // 场上子弹容器（T4）
-    int hitCount_ = 0;            // T4 调试计数：子弹命中敌人次数（伤害结算 T5）
+    std::vector<XPOrb> xpOrbs_{};   // 场上经验点（T5：击杀掉落视觉反馈；吸取 T7）
+    int hitCount_ = 0;            // T4 调试计数：子弹命中敌人次数
 };
