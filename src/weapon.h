@@ -29,8 +29,13 @@ public:
     const std::string& typeId() const;  // 注册名，如 "pistol" / "shotgun" / "orbital"
 
     // ---- 展示信息（T6 HUD 显示；默认回退注册名，子类按需覆写）----
-    virtual const char* displayName() const { return typeId_.c_str(); }  // 显示名（如"手枪"）
-    virtual const char* description() const { return ""; }               // 一句话说明（如"自动射击"）
+    virtual std::string displayName() const { return typeId_; }  // 显示名（如"手枪"）
+    virtual std::string description() const { return ""; }       // 一句话说明（如"自动射击"）
+
+    // ---- T9 扩展接口（默认实现均无害，新增武器零成本接入）----
+    virtual void draw(const Player& player) const;   // 持续型武器自绘（环绕飞刃；默认不画）
+    virtual void upgradePick();                      // 装备词条再选：伤害 += upgradeDamageAmount()
+    virtual float upgradeDamageAmount() const;       // 再选升级增量（按武器差异化：手枪 6/霰弹 3/飞刃 4）
 
     // ---- 工厂注册机制（新增武器只增不改的关键）----
     using Factory = std::function<std::unique_ptr<Weapon>(const Stats* stats)>;

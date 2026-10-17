@@ -3,8 +3,13 @@
 // projectile.h —— 子弹与敌方弹体（含阵营标志）
 // T4：玩家子弹的飞行/射程衰减/出界失效/自绘；命中造成的伤害 T5 结算；
 //     敌方弹体（EnemySide）在 T8 喷吐者接入。
+// T9：穿透机制（穿甲弹词条）：子弹可穿过 pierce 个敌人，同一敌人不再重复结算。
 // ============================================================
+#include <vector>
+
 #include "raylib.h"
+
+class Enemy;  // 前向声明：仅作命中记录（不持有所有权）
 
 class Projectile {
 public:
@@ -26,6 +31,13 @@ public:
     Faction faction() const { return faction_; }
     bool  alive() const { return alive_; }
     void  markDead() { alive_ = false; }   // 命中/失效后由 GameEngine 标记移除
+    void  consumePierce() { if (pierceLeft_ > 0) --pierceLeft_; }  // T9：消耗一次穿透
+
+    // ---- T9 穿透：穿甲弹词条设置可穿透敌人数；命中记录防同弹同敌重复结算 ----
+    void setPierce(int pierce) { pierceLeft_ = pierce; }
+    int  pierces() const { return pierceLeft_; }
+    bool hasHit(const Enemy* e) const;
+    void recordHit(const Enemy* e);
 
 private:
     Vector2 pos_{};                        // 世界坐标
@@ -35,4 +47,6 @@ private:
     float   rangeLeft_ = 0.0f;             // 剩余射程（超出衰减消失）
     Faction faction_ = Faction::PlayerSide;
     bool    alive_ = true;                 // 存活标志（命中/超射程/出界后置 false）
+    int     pierceLeft_ = 0;               // T9：剩余可穿透敌人数（0=命中即消失）
+    std::vector<const Enemy*> hits_{};     // T9：已命中敌人记录（穿透防重复）
 };

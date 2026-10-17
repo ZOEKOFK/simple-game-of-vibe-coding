@@ -1,5 +1,7 @@
-// projectile.cpp —— 子弹实现（T4：飞行/射程/出界/自绘；命中伤害 T5）
+// projectile.cpp —— 子弹实现（T4：飞行/射程/出界/自绘；命中伤害 T5；穿透记录 T9）
 #include "projectile.h"
+
+#include <algorithm>
 
 #include "arena.h"
 #include "constants.h"
@@ -40,4 +42,13 @@ void Projectile::draw() const {
                         ? constants::projectile::kEnemyBulletColor
                         : constants::projectile::kBulletColor;
     DrawCircleV(pos_, radius_, c);
+}
+
+bool Projectile::hasHit(const Enemy* e) const {
+    // T9 穿透：线性查找已命中记录（子弹寿命短、记录极少，无性能压力）
+    return std::find(hits_.begin(), hits_.end(), e) != hits_.end();
+}
+
+void Projectile::recordHit(const Enemy* e) {
+    hits_.push_back(e);  // T9 穿透：防止同一子弹多帧内对同一敌人重复结算
 }

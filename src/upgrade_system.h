@@ -31,8 +31,9 @@ public:
     std::vector<Affix> drawChoices(int count, GameContext& ctx);
 
     // 应用选项：属性类 → affix.apply(Stats)；instantHpGain > 0 → 立即回血；
-    // 装备类 T7 只做占位补偿（apply 内已加属性），真实武器 T9 接 Player::addWeapon
-    void applyChoice(const Affix& affix, GameContext& ctx);
+    //   装备类（kind=Weapon）→ Player::giveWeapon（T9 真实装备/升级伤害）。
+    // 返回 1=新获得武器 / 2=已有武器升级 / 0=其余（供 GameEngine 提示文案分支）
+    int applyChoice(const Affix& affix, GameContext& ctx);
 
 private:
     int level_ = 1;

@@ -45,7 +45,9 @@ public:
 
     // ---- T7 升级三选一（UPGRADE 状态；遮罩由 GameEngine 绘制）----
     Rectangle upgradeCardRect(int index) const;    // 第 index(0~2) 张卡片区（逻辑坐标，供鼠标判定）
-    void drawUpgradeChoices(const std::vector<Affix>& choices, int hovered) const;
+    // T9：player 供"已持有装备词条"动态文案（升级伤害）判定；nullptr 退化为静态文案
+    void drawUpgradeChoices(const std::vector<Affix>& choices, int hovered,
+                            const Player* player) const;
 
     // ---- 公共文字绘制（带中文字体；供 GameEngine 画操作提示/死亡占位等）----
     void drawText(const char* text, float x, float y, float size, Color color) const;

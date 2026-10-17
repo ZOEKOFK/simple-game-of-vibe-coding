@@ -17,7 +17,7 @@ bool playerHasWeapon(const GameContext& ctx, const std::string& typeId) {
     for (const auto& w : ws) {
         if (w && w->typeId() == typeId) return true;
     }
-    return false;  // T7 装备类词条仅占位补偿、未真实装备，因此不会命中
+    return false;  // 未持有该武器（装备词条前置过滤：如"飞刃强化"需先有 orbiting 飞刃）
 }
 
 // 两段式抽取第一段：稀有度权重 普通 60 / 稀有 30 / 史诗 10（docs/03 4.6）
@@ -94,12 +94,17 @@ std::vector<Affix> UpgradeSystem::drawChoices(int count, GameContext& ctx) {
     return result;
 }
 
-void UpgradeSystem::applyChoice(const Affix& affix, GameContext& ctx) {
-    if (ctx.player == nullptr) return;
+int UpgradeSystem::applyChoice(const Affix& affix, GameContext& ctx) {
+    if (ctx.player == nullptr) return 0;
+    // T9 装备类：真实装备（无则创建 / 有则升级伤害），返回值供屏幕提示分支
+    if (affix.kind == AffixKind::Weapon) {
+        return ctx.player->giveWeapon(affix.weaponId);
+    }
     if (affix.apply) {
         affix.apply(ctx.player->statsMutable());  // 属性联动：全部数值收敛于 Stats
     }
     if (affix.instantHpGain > 0.0f) {
         ctx.player->heal(affix.instantHpGain);    // 如"强健"：上限 +20 且立即回复 20
     }
+    return 0;
 }

@@ -1,11 +1,12 @@
-// weapon.cpp —— Weapon 实现（T4：索敌主流程；工厂注册表与强化重扫 T7/T9）
+// weapon.cpp —— Weapon 实现（T4：索敌主流程；T9：工厂注册表与再选升级）
 #include "weapon.h"
 
-#include "enemy.h"   // Enemy 位置/半径查询
-#include "game.h"    // GameContext 完整定义：敌人遍历 + 子弹容器
-#include "player.h"  // Player 位置查询
-#include "raymath.h" // Vector2Length（基类默认开火前置处理用）
-#include "stats.h"   // Stats 攻速倍率（T7 词条联动）
+#include "constants.h"  // T9：再选升级伤害增量
+#include "enemy.h"      // Enemy 位置/半径查询
+#include "game.h"       // GameContext 完整定义：敌人遍历 + 子弹容器
+#include "player.h"     // Player 位置查询
+#include "raymath.h"    // Vector2Length（基类默认开火前置处理用）
+#include "stats.h"      // Stats 攻速倍率（T7 词条联动）
 
 namespace {
 
@@ -32,6 +33,41 @@ const Enemy* findNearestEnemyInRange(GameContext& ctx, const Vector2& playerPos,
 
 const std::string& Weapon::typeId() const { return typeId_; }
 
+// ============================================================
+// T9：工厂注册表与再选升级（新增武器不改旧文件的关键机制）
+// ============================================================
+std::unordered_map<std::string, Weapon::Factory>& Weapon::registry() {
+    static std::unordered_map<std::string, Weapon::Factory> reg;
+    return reg;
+}
+
+void Weapon::registerWeapon(const std::string& id, Weapon::Factory f) {
+    registry().emplace(id, std::move(f));  // 重复注册安全忽略（id 全局唯一约定）
+}
+
+std::unique_ptr<Weapon> Weapon::create(const std::string& id, const Stats* stats) {
+    auto& reg = registry();
+    const auto it = reg.find(id);
+    if (it == reg.end()) return nullptr;  // 未注册 id：返回空（Player::giveWeapon 丢弃）
+    return it->second(stats);
+}
+
+void Weapon::upgradePick() {
+    // 装备词条再选到已有武器：伤害按武器差异化成长（手枪 +6 / 霰弹每弹丸 +3 / 飞刃 +4），
+    // 保证各武器复选收益统一在 ≈+25%（docs/05 §4.1 平衡自查结论）
+    baseDamage_ += upgradeDamageAmount();
+}
+
+float Weapon::upgradeDamageAmount() const {
+    // 默认（单发类）= 手枪增量；多弹丸/多段类在子类覆写为更低值
+    return constants::weapon::kWeaponUpgradeDamage;
+}
+
+void Weapon::draw(const Player& player) const {
+    // 发射型武器无持续本体；环绕飞刃覆写本接口自绘
+    (void)player;
+}
+
 Weapon::Weapon(float fireInterval, float damage, float range) {
     fireInterval_ = fireInterval;
     baseDamage_ = damage;
@@ -49,7 +85,7 @@ void Weapon::update(float dt, GameContext& ctx, const Player& player) {
     // 3) 到点开火：具体开火模式（单发/散射/持续）由子类覆写 fire()/update() 实现
     if (fireTimer_ <= 0.0f) {
         fire(ctx, player, target->pos());
-        // T7 词条联动：实际间隔 = 基础间隔 ÷ 攻速倍率（急速/飞刃占位词条生效）
+        // T7 词条联动：实际间隔 = 基础间隔 ÷ 攻速倍率（急速/神速生效；环绕飞刃无间隔不参与）
         fireTimer_ = fireInterval_ /
                      (stats_ != nullptr ? stats_->attackSpeedMult : 1.0f);
     }

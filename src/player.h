@@ -22,10 +22,13 @@ public:
     void update(float dt, Vector2 inputDir);       // T2：移动 + 无敌帧/击退衰减
     void updateWeapons(float dt, GameContext& ctx);  // T4：逐武器索敌/冷却/开火
     void draw() const;                             // T2：自绘（含无敌闪烁）
+    void drawWeapons() const;                      // T9：持续型武器（环绕飞刃）自绘
 
     void takeDamage(float amount, Vector2 fromPos);  // T5：无敌帧内忽略；否则扣血并击退
     void heal(float amount);                          // T7：回血（HP 上限截断；词条瞬时回复/每秒再生共用）
-    void addWeapon(std::unique_ptr<Weapon> w);       // T7：装备类词条由此进入（结构就绪，T9 实装武器）
+    // T9：装备词条实装——按注册名发放武器：无则创建、有则升级伤害。
+    //     返回 1=新获得 / 2=已有升级 / 0=无效注册名（供提示文案分支）
+    int  giveWeapon(const std::string& weaponId);
 
     // ---- 查询接口（只读，供武器/UI/碰撞系统使用）----
     const Vector2& pos() const;   // 世界坐标

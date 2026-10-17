@@ -136,6 +136,30 @@ constexpr float kPistolFireInterval = 1.0f / 2.4f;  // 攻击间隔（秒）≈0
 constexpr float kPistolDamage       = 10.0f;        // 单发伤害（爬行者 20 HP 恰为两枪）
 constexpr float kPistolRange        = 600.0f;       // 索敌射程（px）：只锁定射程内最近敌人
 constexpr float kMuzzleOffset       = 20.0f;        // 枪口偏移：玩家圆心外移（半径 14 + 余量）
+
+// ---- 霰弹枪（T9；docs/03 4.3：近距离高爆发、高风险定位）----
+constexpr float kShotgunFireInterval = 1.0f / 0.8f;  // 射速 0.8 发/秒（间隔 1.25s，比手枪慢 3 倍）
+constexpr float kShotgunDamage       = 12.0f;        // 每颗弹丸伤害（贴脸 5 发全中 60）
+constexpr float kShotgunRange        = 500.0f;       // 索敌与弹丸射程：只有近战射程，贴脸才全中
+constexpr int   kShotgunPelletCount  = 5;            // 每次开火弹丸数
+constexpr float kShotgunSpreadDeg    = 25.0f;        // 扇形总开角（±12.5° 均匀分布 5 发）
+
+// ---- 环绕飞刃（T9；docs/03 4.3：被动近身威慑，不参与索敌）----
+constexpr float kOrbitalBladeDamage  = 15.0f;  // 单刃单次命中伤害（每敌 0.5s 至多一次 ≈ 30 DPS/刃）
+constexpr float kOrbitalBladeRadius  = 10.0f;  // 刃体碰撞半径（命中判定与绘制）
+constexpr float kOrbitalRadius       = 90.0f;  // 环绕半径（px）：略大于玩家贴身层
+constexpr float kOrbitalAngularSpeed = 1.8f;   // 旋转角速度（rad/s）：2s 内旋转一圈
+constexpr float kOrbitalHitInterval  = 0.5f;   // 同一敌人的伤害结算冷却（秒）
+constexpr int   kOrbitalBladeCount   = 2;      // 初始刃数（与任务规格一致的两刃）
+constexpr Color kOrbitalBladeColor   {240, 240, 255, 255};  // 刃体：银白
+constexpr Color kOrbitalBladeGlow    {140, 160, 255, 90};    // 刃体光晕：淡蓝（提示杀伤范围）
+
+// ---- 武器已有再选 → 升级（docs/03 4.7；差异化数值依据 docs/05 平衡自查 §4.1）----
+constexpr float kWeaponUpgradeDamage   = 6.0f;  // 手枪等单发类：再选单发伤害 +6（≈+25%）
+constexpr float kShotgunUpgradeDamage  = 3.0f;  // 霰弹：每弹丸 +3（5 发齐射 +15，≈+25%）
+constexpr float kOrbitalUpgradeDamage  = 4.0f;  // 飞刃：单刃 +4（≈+27%）
+                                           // 理由：若共用 +6，霰弹齐射增伤 +50%、飞刃 +40%，
+                                           // 装备类词条复选时强弱武器成长失衡（docs/05）
 }  // namespace weapon
 
 // ---- 子弹（docs/03 4.6：弹速 600、射程 900）----
@@ -169,8 +193,14 @@ constexpr float kBulletSpeedBoost  = 1.25f;  // 高速子弹：弹速 ×1.25
 constexpr float kPickupBonus       = 30.0f;  // 磁力：拾取半径 +30
 constexpr float kHpRegenBonus      = 1.0f;   // 生命再生：每秒回复 1 HP
 constexpr float kDamageTakenReduce = 0.9f;   // 韧性：受伤 ×0.9
-constexpr float kWeaponPlaceholderDamage      = 1.15f;  // 霰弹枪占位补偿：伤害 ×1.15（T9 换真实武器）
-constexpr float kWeaponPlaceholderAttackSpeed = 1.10f;  // 环绕飞刃占位补偿：攻速 ×1.10（T9 换真实武器）
+// ---- T9 新增（docs/03 4.7 v2：词条池 17 项）----
+constexpr float kLifestealPct      = 0.02f;  // 吸血：造成伤害的 2% 回复生命
+constexpr int   kPenetrationBonus  = 1;      // 穿甲弹：子弹穿透数 +1（穿过 1 个敌人后消失）
+constexpr float kAttackSpeedBig    = 1.20f;  // 神速：攻速 ×1.20（史诗；docs/05 §4.2 由 1.25 下调）
+constexpr float kDamageTakenBig    = 0.80f;  // 铁甲：受伤 ×0.8（史诗）
+constexpr float kHpBonusBig        = 40.0f;  // 巨人：上限 +40 并立即回复 20（史诗）
+constexpr float kPickupBonusBig    = 60.0f;  // 强磁力：拾取半径 +60（史诗）
+constexpr float kBladeDamageBonus  = 5.0f;   // 飞刃强化：单刃伤害 +5（需已有环绕飞刃）
 }  // namespace affix
 
 // ---- HUD（T6：屏幕空间 UI；颜色/字号保证深色背景下清晰）----
@@ -181,7 +211,8 @@ constexpr const char* kFontPathSimHei = "C:/Windows/Fonts/simhei.ttf"; // 回退
 constexpr const char* kCnCharSet =
     "第波剩余时间敌人击杀手枪自动射击死亡逻辑将在后续任务实现方向键移动刷怪退出·（）"
     "选择升级按或鼠标点击普通稀有史诗伤害强化攻健生命上限并回复高磁力拾取半径每秒"
-    "受伤获得暂补偿霰环绕飞刃单已取本次再韧性急促跑武器「」下中一";
+    "受伤获得暂补偿霰环绕飞刃单已取本次再韧性急促跑武器「」下中一"
+    "吸血神铁巨人甲弹穿透发散速子扇形：，";
 constexpr int   kFontBaseSize  = 32;   // 字体图集基准字号（px），绘制时按需缩放
 constexpr int   kHudMargin     = 16;   // HUD 距屏幕边缘边距（px）
 constexpr int   kExpBarWidth   = 260;  // 经验条宽（px）

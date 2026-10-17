@@ -93,26 +93,31 @@ void GameEngine::update(float dt) {
             p->update(dt);
         }
 
-        // T5/T8：子弹×敌人命中结算——朴素双循环（实体量大后的优化在 T11 换空间哈希）；
+        // T5/T8/T9：子弹×敌人命中结算——朴素双循环（实体量大后的优化在 T11 换空间哈希）；
         //     仅玩家阵营弹参与敌人命中（T8：喷吐者敌弹走下方"敌弹×玩家"结算，不伤同胞）；
-        //     命中即单次伤害（穿透类武器后续扩展），击杀则掉落经验点（吸取 T7）
+        //     T9 穿透：穿甲弹可穿过若干敌人，同一子弹对同一敌人只结算一次（hasHit 判重）。
+        //     死亡统一在帧末移除扫描结算（击杀数/波次账本/经验掉落），保证飞刃等多种死因一致。
         for (const auto& p : projectiles_) {
             if (!p->alive()) continue;
             if (p->faction() != Projectile::Faction::PlayerSide) continue;  // T8：敌弹跳过
             for (const auto& e : enemies_) {
                 if (!e || e->isDead()) continue;
+                if (p->hasHit(e.get())) continue;  // T9 穿透：同弹同敌不重复结算
                 if (collision::circlesOverlap(p->pos(), p->radius(),
                                               e->pos(), e->radius())) {
-                    p->markDead();  // 命中子弹消失
                     ++hitCount_;
-                    if (e->takeDamage(p->damage())) {
-                        // 击杀：累计击杀数（T6 HUD）并掉落经验点（绿色小方块，吸取 T7）
-                        ++killCount_;
-                        waveManager_.notifyEnemyDied();  // T8：本波存活账本递减（清场判定）
-                        xpOrbs_.emplace_back(e->pos(),
-                                             static_cast<float>(e->xpValue()));
+                    e->takeDamage(p->damage());
+                    p->recordHit(e.get());  // T9：命中记录（穿透判定用）
+                    // T9 吸血：按本次结算伤害比例回血（飞刃吸血在其武器层结算）
+                    if (player_.stats().lifestealPct > 0.0f) {
+                        player_.heal(p->damage() * player_.stats().lifestealPct);
                     }
-                    break;  // 单发子弹只结算一个敌人
+                    if (p->pierces() > 0) {
+                        p->consumePierce();  // T9：穿甲弹——消耗一次穿透继续飞行
+                    } else {
+                        p->markDead();       // 无穿透：命中即消失（T8 原行为）
+                    }
+                    break;  // 单发子弹每帧至多结算一个敌人
                 }
             }
         }
@@ -125,6 +130,16 @@ void GameEngine::update(float dt) {
                                           player_.pos(), player_.radius())) {
                 player_.takeDamage(p->damage(), p->pos());
                 p->markDead();
+            }
+        }
+
+        // T9：死亡统一结算——所有死因（子弹/环绕飞刃/后续武器）的击杀数、波次账本、
+        //     经验掉落集中在此处理，保证任意武器击杀的行为一致（对 T8 行为等价）
+        for (const auto& e : enemies_) {
+            if (e && e->isDead()) {
+                ++killCount_;
+                waveManager_.notifyEnemyDied();  // T8：本波存活账本递减（清场判定）
+                xpOrbs_.emplace_back(e->pos(), static_cast<float>(e->xpValue()));
             }
         }
 
@@ -205,11 +220,16 @@ void GameEngine::resolveUpgradeChoice(int idx) {
     const Affix chosen = choices_[idx];
 
     GameContext ctx{&enemies_, &projectiles_, &player_, &xpOrbs_, &spawner_};
-    upgrade_.applyChoice(chosen, ctx);  // 属性类 → 修改 Stats；装备类 → 占位补偿属性
+    // 属性类 → 修改 Stats；装备类 → 真实装备/升级（T9），返回 1 新获得 / 2 已升级 / 0 其余
+    const int result = upgrade_.applyChoice(chosen, ctx);
 
-    // 装备类占位提示：选择后屏幕中央显示 3 秒（字体不可用回退英文）
-    if (!chosen.equipNotice.empty()) {
-        noticeText_ = ui_.cnFontAvailable() ? chosen.equipNotice : chosen.equipNoticeEn;
+    // 装备类提示（T9）：按返回分支显示"已获取「XX」/ 已升级「XX」" 3 秒（字体不可用回退英文）
+    if (result > 0) {
+        if (ui_.cnFontAvailable()) {
+            noticeText_ = (result == 1 ? "已获取「" : "已升级「") + chosen.name + "」";
+        } else {
+            noticeText_ = chosen.nameEn + (result == 1 ? " acquired" : " upgraded");
+        }
         noticeTimer_ = 3.0f;
     }
 
@@ -244,6 +264,7 @@ void GameEngine::draw() {
                 for (const auto& p : projectiles_) p->draw(); // 子弹（黄色小圆）
                 for (const auto& o : xpOrbs_) o.draw();       // 经验点（绿色小方块，T5）
                 player_.draw();                               // 玩家（世界坐标）
+                player_.drawWeapons();                        // T9：环绕飞刃等持续武器自绘
             }
             EndMode2D();
             // ---- T6 HUD（屏幕空间，替换 T4/T5 左上角临时调试文字）----
@@ -282,7 +303,7 @@ void GameEngine::draw() {
                 DrawRectangle(0, 0, constants::window::kLogicWidth,
                               constants::window::kLogicHeight,
                               constants::ui::kDimOverlay);
-                ui_.drawUpgradeChoices(choices_, hoveredCard_);
+                ui_.drawUpgradeChoices(choices_, hoveredCard_, &player_);
             }
         } else {
             // ---- T1 空壳展示（保留）：黑底 + 当前状态名 ----

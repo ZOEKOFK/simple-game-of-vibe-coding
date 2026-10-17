@@ -1,8 +1,9 @@
-// player.cpp —— Player 实现（T2：移动+自绘；T4：初始手枪与武器驱动；T5：受击/无敌帧/击退；T7 装备）
+// player.cpp —— Player 实现（T2：移动+自绘；T4：初始手枪与武器驱动；T5：受击/无敌帧/击退；T9 装备发放）
 #include "player.h"
 
 #include <cmath>
 #include <memory>
+#include <string>
 
 #include "arena.h"
 #include "constants.h"
@@ -38,8 +39,26 @@ void Player::heal(float amount) {
     if (hp_ > cap) hp_ = cap;
 }
 
-void Player::addWeapon(std::unique_ptr<Weapon> w) {
-    weapons_.push_back(std::move(w));  // T7 结构就绪；T9 装备类词条经此接入真实武器
+int Player::giveWeapon(const std::string& weaponId) {
+    // 已有该武器 → 升级伤害（Weapon::upgradePick；飞刃/霰弹同一成长规则）
+    for (auto& w : weapons_) {
+        if (w && w->typeId() == weaponId) {
+            w->upgradePick();
+            return 2;
+        }
+    }
+    // 未持有 → 经工厂注册表创建（新增武器不改本函数；无效 id 返回 nullptr）
+    auto w = Weapon::create(weaponId, &stats_);
+    if (!w) return 0;
+    weapons_.push_back(std::move(w));
+    return 1;
+}
+
+void Player::drawWeapons() const {
+    // T9：持续型武器自绘（发射型 draw 为空实现，无开销）
+    for (const auto& w : weapons_) {
+        w->draw(*this);
+    }
 }
 
 void Player::takeDamage(float amount, Vector2 fromPos) {

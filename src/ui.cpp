@@ -1,6 +1,7 @@
 // ui.cpp —— UIManager 实现（T6：进行中游戏 HUD）
 #include "ui.h"
 
+#include <algorithm>
 #include <cmath>
 #include <string>
 #include <vector>
@@ -189,14 +190,20 @@ void UIManager::drawHUD(const HudSnapshot& s) const {
     drawTextAligned(killText.c_str(), rightX, static_cast<float>(m) + 74.0f, 16,
                     constants::ui::kTextMainColor, 2);
 
-    // ---- 底部居中：当前武器名 + 简要说明（如"手枪 · 自动射击"）----
+    // ---- 底部居中：本局武器列表（T9：多武器逐个拼接"名 · 说明"，字体回退时拼注册名）----
     const auto& weapons = s.player->weapons();
     if (!weapons.empty()) {
-        const Weapon& w = *weapons.front();
-        // 字体回退模式下描述为中文会乱码，仅显示注册名（pistol）
-        const std::string label = fontValid_
-            ? (std::string(w.displayName()) + " · " + w.description())
-            : w.typeId();
+        std::string label;
+        for (size_t i = 0; i < weapons.size(); ++i) {
+            if (i > 0) label += "    ";  // 多武器四空格间隔，便于区分
+            if (fontValid_) {
+                label += weapons[i]->displayName();
+                label += " · ";
+                label += weapons[i]->description();
+            } else {
+                label += weapons[i]->typeId();
+            }
+        }
         drawTextAligned(label.c_str(), W * 0.5f,
                         constants::window::kLogicHeight - m - 26.0f, 20,
                         constants::ui::kTextMainColor, 1);
@@ -220,7 +227,8 @@ Rectangle UIManager::upgradeCardRect(int index) const {
                      static_cast<float>(constants::ui::kCardHeight)};
 }
 
-void UIManager::drawUpgradeChoices(const std::vector<Affix>& choices, int hovered) const {
+void UIManager::drawUpgradeChoices(const std::vector<Affix>& choices, int hovered,
+                                   const Player* player) const {
     const float cx = constants::window::kLogicWidth * 0.5f;  // 水平中轴
     const Rectangle first = upgradeCardRect(0);
 
@@ -243,8 +251,23 @@ void UIManager::drawUpgradeChoices(const std::vector<Affix>& choices, int hovere
             DrawRectangleLinesEx(r, 3.0f, constants::ui::kCardHoverBorder);
         }
 
+        // T9 装备类动态文案：已持有该武器 → 展示"升级武器：伤害 +N"（N 取自
+        // upgradeDamageAmount()，与真实升级增量一致；不同武器 N 不同，见 docs/05 §4.1）
+        std::string ownedDesc;
         const char* name = fontValid_ ? a.name.c_str() : a.nameEn.c_str();
         const char* desc = fontValid_ ? a.description.c_str() : a.descriptionEn.c_str();
+        if (a.kind == AffixKind::Weapon && player != nullptr) {
+            const auto& ws = player->weapons();
+            const auto it = std::find_if(
+                ws.begin(), ws.end(),
+                [&](const auto& w) { return w && w->typeId() == a.weaponId; });
+            if (it != ws.end()) {
+                const int amt = static_cast<int>((*it)->upgradeDamageAmount());
+                ownedDesc = fontValid_ ? ("升级武器：伤害 +" + std::to_string(amt))
+                                       : ("Weapon upgrade: damage +" + std::to_string(amt));
+                desc = ownedDesc.c_str();
+            }
+        }
         drawText(name, r.x + 20.0f, r.y + 16.0f, 22, fg);                       // 词条名
         drawText(rarityLabel(a.rarity, fontValid_), r.x + 20.0f, r.y + 48.0f,   // 稀有度标签
                  14, fg);
