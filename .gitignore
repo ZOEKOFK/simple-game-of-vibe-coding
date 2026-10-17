@@ -1,0 +1,14 @@
+# CMake 构建产物
+build/
+out/
+CMakeUserPresets.json
+
+# vcpkg 工具本体（本地克隆，不入库）
+.vcpkg/
+
+# vcpkg 安装产物（头文件/链接库，本地重建即可）
+vcpkg_installed/
+
+# IDE / 系统杂项
+.vs/
+*.user

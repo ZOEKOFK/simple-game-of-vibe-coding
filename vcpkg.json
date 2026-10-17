@@ -1,0 +1,15 @@
+{
+  "name": "arena-survivor",
+  "version-string": "0.1.0",
+  "description": "《竞技场幸存者》课程大作业：俯视角竞技场生存射击游戏",
+  "builtin-baseline": "a5f736224e85b32e25a8ffc52562333180396642",
+  "dependencies": [
+    "raylib"
+  ],
+  "overrides": [
+    {
+      "name": "raylib",
+      "version": "4.5.0"
+    }
+  ]
+}

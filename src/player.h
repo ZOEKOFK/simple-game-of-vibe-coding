@@ -1,0 +1,38 @@
+#pragma once
+// ============================================================
+// player.h —— 玩家
+// 职责：八方向移动、受击/无敌帧/击退，持有武器与 Stats。
+// T1 仅声明类与成员；移动在 T2、受击在 T5、武器装配在 T7 实现。
+// ============================================================
+#include <memory>
+#include <vector>
+
+#include "raylib.h"  // Vector2
+#include "weapon.h"  // unique_ptr<Weapon> 析构需要完整类型
+#include "stats.h"
+
+class Player {
+public:
+    // ---- 行为接口 ----
+    void update(float dt, Vector2 inputDir);       // T2：移动 + 无敌帧/击退衰减
+    void draw() const;                             // T2：自绘（含无敌闪烁）
+
+    void takeDamage(float amount, Vector2 fromPos);  // T5：无敌帧内忽略；否则扣血并击退
+    void addWeapon(std::unique_ptr<Weapon> w);       // T7：装备类词条由此进入
+
+    // ---- 查询接口（只读，供武器/UI/碰撞系统使用）----
+    const Vector2& pos() const;   // 世界坐标
+    float radius() const;         // 碰撞半径
+    int   maxHp() const;          // 最大生命 = 基础值 + Stats 加成
+    int   hp() const;             // 当前生命
+    float pickupRadius() const;   // 拾取半径
+    const Stats& stats() const;   // 属性中心（词条修改点）
+
+private:
+    Vector2 pos_{};                 // 世界坐标
+    float   hp_ = 100.0f;           // 当前生命（基线见 docs/03 数值表，T2 收编入 constants.h）
+    Stats   stats_{};               // 属性中心
+    Vector2 knockbackVel_{};        // 击退速度（受击瞬间赋值，逐帧衰减）
+    float   invincibleTimer_ = 0.0f;  // 无敌帧计时（>0 时不受伤）
+    std::vector<std::unique_ptr<Weapon>> weapons_{};  // 本局武器列表
+};
