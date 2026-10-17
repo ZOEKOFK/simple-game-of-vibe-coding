@@ -46,4 +46,25 @@ constexpr Color kWallColor     {204, 68, 48, 255};  // 围墙主体（醒目橙�
 constexpr Color kWallEdgeColor {255, 140, 96, 255}; // 墙内缘高亮描边
 }  // namespace arena
 
+// ---- 敌人（docs/03 4.3 数值基线；T3 先落地爬行者）----
+namespace enemy {
+// 爬行者：近战追踪型
+constexpr float kCrawlerHp     = 20.0f;   // 生命
+constexpr float kCrawlerSpeed  = 120.0f;  // 移速（px/s），约为玩家 0.55 倍，可被甩开
+constexpr float kCrawlerRadius = 14.0f;   // 碰撞半径（与玩家同规格）
+
+// 分离力：同族距离小于该值时互相推离（约两半径和），避免敌人叠成一点
+constexpr float kSeparationRadius   = 30.0f;
+constexpr float kSeparationStrength = 0.6f;  // 分离力权重（相对追踪方向的力度，0~1）
+
+// 生成规则（T3 调试用，正式波次 T8 接入）
+constexpr int   kDebugSpawnCount    = 10;     // F1 一次刷怪数量
+constexpr float kSpawnMinPlayerDist = 400.0f; // 出生点距玩家最小距离，防骑脸
+
+// 配色：红色系与玩家蓝色明显区分；接触中描边变亮黄作为接触标记
+constexpr Color kCrawlerColor        {220, 60, 50, 255};
+constexpr Color kCrawlerOutlineColor {110, 30, 25, 255};
+constexpr Color kContactColor        {255, 210, 90, 255};
+}  // namespace enemy
+
 }  // namespace constants

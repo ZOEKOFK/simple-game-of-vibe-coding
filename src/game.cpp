@@ -2,8 +2,11 @@
 // game.cpp —— GameEngine 实现
 // T1：窗口初始化、固定时间步主循环（accumulator 模式）、五状态空壳切换。
 // T2：PLAYING 状态接入 八方向输入→Player 移动、摄像机跟随与竞技场绘制。
+// T3：F1 调试刷怪 + 敌人追踪/分离 AI 更新与绘制、临调敌人数显示。
 // ============================================================
 #include "game.h"
+
+#include <string>
 
 #include "arena.h"
 #include "constants.h"
@@ -54,6 +57,18 @@ void GameEngine::update(float dt) {
     // T2：仅 PLAYING 状态响应移动（在固定步长内更新，逻辑与帧率解耦）
     if (state_ == GameState::PLAYING) {
         player_.update(dt, readMoveInput());
+
+        // T3：F1 临时刷 10 只爬行者用于调试（正式波次逻辑 T8 接入）
+        if (IsKeyPressed(KEY_F1)) {
+            auto batch = spawner_.spawnWave(constants::enemy::kDebugSpawnCount, player_.pos());
+            for (auto& e : batch) enemies_.push_back(std::move(e));
+        }
+
+        // T3：敌人 AI 更新（追踪 + 分离 + 接触标记；伤害结算 T5）
+        GameContext ctx{&enemies_};
+        for (const auto& e : enemies_) {
+            e->update(dt, player_.pos(), ctx);
+        }
     }
 }
 
@@ -67,12 +82,15 @@ void GameEngine::draw() {
             camera_.target = player_.pos();  // 镜头跟随：玩家恒保持屏幕中心
             BeginMode2D(camera_);
             {
-                drawArena();     // 地面/网格/围墙（世界坐标）
-                player_.draw();  // 玩家（世界坐标）
+                drawArena();                              // 地面/网格/围墙（世界坐标）
+                for (const auto& e : enemies_) e->draw(); // 敌人（世界坐标）
+                player_.draw();                           // 玩家（世界坐标）
             }
             EndMode2D();
-            // 操作提示（屏幕空间；正式 UI 由 T6 实现）
-            DrawText("WASD / 方向键 移动     Esc 退出", 20, 20, 20, LIGHTGRAY);
+            // 操作提示与临调显示（屏幕空间；正式 UI 由 T6 实现）
+            DrawText("WASD / 方向键 移动    F1 刷怪    Esc 退出", 20, 20, 20, LIGHTGRAY);
+            const std::string countText = "敌人数量: " + std::to_string(enemies_.size());
+            DrawText(countText.c_str(), 20, 48, 20, GOLD);
         } else {
             // ---- T1 空壳展示（保留）：黑底 + 当前状态名 ----
             ClearBackground(BLACK);  // 验收预期：黑色窗口
