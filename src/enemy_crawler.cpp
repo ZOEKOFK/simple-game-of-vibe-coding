@@ -1,7 +1,6 @@
 // enemy_crawler.cpp —— 爬行者实现（T3：追踪 + 同族分离力 + 接触标记）
 #include "enemy_crawler.h"
 
-#include "arena.h"
 #include "constants.h"
 #include "game.h"     // GameContext 完整定义（分离力需遍历敌人列表）
 #include "raymath.h"  // Vector2Length（raylib.h 未包含 raymath，需显式引入）
@@ -48,11 +47,10 @@ void Crawler::decide(float dt, const Vector2& playerPos, GameContext& ctx) {
     }
     pos_.x += move.x * moveSpeed_ * dt;
     pos_.y += move.y * moveSpeed_ * dt;
+    // 注意：此处不做竞技场钳制——敌人出生在墙外（开发者确认的入场方式），
+    // 直线追踪玩家翻越围墙入场；场外→场内过渡与通用边界约束在 T5 统一处理。
 
-    // 4) 边界钳制（含半径，防嵌墙，与玩家同规则）
-    pos_ = clampToArena(pos_, radius_);
-
-    // 5) 接触标记：与玩家距离小于两半径和（伤害结算留 T5）
+    // 4) 接触标记：与玩家距离小于两半径和（伤害结算留 T5）
     touchingPlayer_ = distToPlayer < (radius_ + constants::player::kRadius);
 }
 

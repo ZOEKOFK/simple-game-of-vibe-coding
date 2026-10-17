@@ -18,26 +18,31 @@ float randomRange(float min, float max) {
 Vector2 EnemySpawner::pickSpawnPos(const Vector2& playerPos) const {
     using namespace constants::arena;
     using constants::enemy::kSpawnMinPlayerDist;
-    // 出生带 = 墙内缘内收"一个敌人半径 + 少量余量"，视觉上从场地边缘走向玩家
-    const float inset = kWallThickness + constants::enemy::kCrawlerRadius + 8.0f;
+    using constants::enemy::kSpawnOutsideDepth;
+    // 墙外出生带：距墙外缘 2~36px 的环形区域（开发者确认：敌人从竞技场外入场，
+    // 直线追踪玩家并翻越围墙；正式入场规则仍可在 T8 波次阶段再调）
+    const float nearDist = 2.0f;
 
     for (int attempt = 0; attempt < 30; ++attempt) {
-        const int side = GetRandomValue(0, 3);  // 上/下/左/右四条边随机
-        const float t = randomRange(0.0f, 1.0f);
+        const int side = GetRandomValue(0, 3);  // 上/下/左/右四条边外随机
+        const float t = randomRange(0.0f, 1.0f);                      // 沿边位置
+        const float depth = randomRange(nearDist, kSpawnOutsideDepth); // 离墙深度
         Vector2 p{};
         switch (side) {
-            case 0: p = {inset + t * (kWidth - 2.0f * inset), inset}; break;                // 上边
-            case 1: p = {inset + t * (kWidth - 2.0f * inset), kHeight - inset}; break;      // 下边
-            case 2: p = {inset, inset + t * (kHeight - 2.0f * inset)}; break;               // 左边
-            default: p = {kWidth - inset, inset + t * (kHeight - 2.0f * inset)}; break;     // 右边
+            case 0: p = {t * kWidth, -depth}; break;                    // 上墙外
+            case 1: p = {t * kWidth, kHeight + depth}; break;           // 下墙外
+            case 2: p = {-depth, t * kHeight}; break;                   // 左墙外
+            default: p = {kWidth + depth, t * kHeight}; break;          // 右墙外
         }
         if (Vector2Distance(p, playerPos) >= kSpawnMinPlayerDist) return p;  // 保证不骑脸出生
     }
 
-    // 重试耗尽兜底：取距玩家最远的场角（距中心 1700px+，必然满足安全距离）
+    // 重试耗尽兜底：取距玩家最远的场外角（距中心 1700px+，必然满足安全距离）
     const Vector2 corners[4] = {
-        {inset, inset}, {kWidth - inset, inset},
-        {inset, kHeight - inset}, {kWidth - inset, kHeight - inset},
+        {-kSpawnOutsideDepth, -kSpawnOutsideDepth},
+        {kWidth + kSpawnOutsideDepth, -kSpawnOutsideDepth},
+        {-kSpawnOutsideDepth, kHeight + kSpawnOutsideDepth},
+        {kWidth + kSpawnOutsideDepth, kHeight + kSpawnOutsideDepth},
     };
     Vector2 best = corners[0];
     float bestDist = Vector2Distance(best, playerPos);

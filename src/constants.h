@@ -60,6 +60,7 @@ constexpr float kSeparationStrength = 0.6f;  // 分离力权重（相对追踪�
 // 生成规则（T3 调试用，正式波次 T8 接入）
 constexpr int   kDebugSpawnCount    = 10;     // F1 一次刷怪数量
 constexpr float kSpawnMinPlayerDist = 400.0f; // 出生点距玩家最小距离，防骑脸
+constexpr float kSpawnOutsideDepth  = 36.0f;  // 墙外出生：距墙外缘的深度（px），敌人从场外入场
 
 // 配色：红色系与玩家蓝色明显区分；接触中描边变亮黄作为接触标记
 constexpr Color kCrawlerColor        {220, 60, 50, 255};
