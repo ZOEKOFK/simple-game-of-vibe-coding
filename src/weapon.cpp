@@ -5,6 +5,7 @@
 #include "game.h"    // GameContext 完整定义：敌人遍历 + 子弹容器
 #include "player.h"  // Player 位置查询
 #include "raymath.h" // Vector2Length（基类默认开火前置处理用）
+#include "stats.h"   // Stats 攻速倍率（T7 词条联动）
 
 namespace {
 
@@ -48,7 +49,9 @@ void Weapon::update(float dt, GameContext& ctx, const Player& player) {
     // 3) 到点开火：具体开火模式（单发/散射/持续）由子类覆写 fire()/update() 实现
     if (fireTimer_ <= 0.0f) {
         fire(ctx, player, target->pos());
-        fireTimer_ = fireInterval_;
+        // T7 词条联动：实际间隔 = 基础间隔 ÷ 攻速倍率（急速/飞刃占位词条生效）
+        fireTimer_ = fireInterval_ /
+                     (stats_ != nullptr ? stats_->attackSpeedMult : 1.0f);
     }
 }
 

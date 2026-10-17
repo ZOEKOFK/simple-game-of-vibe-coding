@@ -14,6 +14,29 @@ namespace {
 // 数值钳制 [0,1]（条填充比例用）
 float clamp01(float v) { return v < 0.0f ? 0.0f : (v > 1.0f ? 1.0f : v); }
 
+// ---- T7 升级卡片：稀有度配色与标签（普通白 / 稀有蓝 / 史诗紫）----
+Color cardBg(Rarity r) {
+    switch (r) {
+        case Rarity::Rare: return constants::ui::kCardBgRare;
+        case Rarity::Epic: return constants::ui::kCardBgEpic;
+        default:           return constants::ui::kCardBgCommon;
+    }
+}
+Color cardText(Rarity r) {
+    switch (r) {
+        case Rarity::Rare: return constants::ui::kCardTextRare;
+        case Rarity::Epic: return constants::ui::kCardTextEpic;
+        default:           return constants::ui::kCardTextCommon;
+    }
+}
+const char* rarityLabel(Rarity r, bool cn) {
+    switch (r) {
+        case Rarity::Rare: return cn ? "稀有" : "Rare";
+        case Rarity::Epic: return cn ? "史诗" : "Epic";
+        default:           return cn ? "普通" : "Common";
+    }
+}
+
 // 构建字体图集 codepoints：ASCII(32~126) + 常用中文集合（constants::ui::kCnCharSet）
 std::vector<int> buildCodepoints() {
     std::vector<int> cps;
@@ -163,5 +186,60 @@ void UIManager::drawHUD(const HudSnapshot& s) const {
         drawTextAligned(label.c_str(), W * 0.5f,
                         constants::window::kLogicHeight - m - 26.0f, 20,
                         constants::ui::kTextMainColor, 1);
+    }
+}
+
+// ============================================================
+// T7：升级三选一（UPGRADE 状态）
+// ============================================================
+
+Rectangle UIManager::upgradeCardRect(int index) const {
+    // 三卡水平排列居中：总宽 = 3×卡宽 + 2×间距；布局同时供绘制与鼠标判定，
+    // 由 GameEngine 借助本函数判定鼠标命中，保证绘制/判定零错位
+    const float totalW = 3.0f * constants::ui::kCardWidth +
+                         2.0f * constants::ui::kCardGap;
+    const float x0 = (constants::window::kLogicWidth - totalW) * 0.5f;
+    const float y0 = (constants::window::kLogicHeight - constants::ui::kCardHeight) * 0.5f;
+    return Rectangle{x0 + index * (constants::ui::kCardWidth + constants::ui::kCardGap),
+                     y0,
+                     static_cast<float>(constants::ui::kCardWidth),
+                     static_cast<float>(constants::ui::kCardHeight)};
+}
+
+void UIManager::drawUpgradeChoices(const std::vector<Affix>& choices, int hovered) const {
+    const float cx = constants::window::kLogicWidth * 0.5f;  // 水平中轴
+    const Rectangle first = upgradeCardRect(0);
+
+    // 标题（卡片上方）与操作提示（卡片下方）；字体不可用整体回退英文
+    drawTextAligned(fontValid_ ? "选择升级" : "LEVEL UP", cx,
+                    first.y - 64.0f, 32, constants::ui::kTextMainColor, 1);
+    drawTextAligned(fontValid_ ? "按 1 / 2 / 3 或鼠标点击选择"
+                               : "Press 1 / 2 / 3 or click to choose",
+                    cx, first.y + constants::ui::kCardHeight + 24.0f, 18,
+                    constants::ui::kTextDimColor, 1);
+
+    for (size_t i = 0; i < choices.size() && i < 3; ++i) {
+        const Affix& a = choices[i];
+        const Rectangle r = upgradeCardRect(static_cast<int>(i));
+        const Color fg = cardText(a.rarity);
+
+        // 卡片底（稀有度配色）+ 悬停亮黄描边
+        DrawRectangleRounded(r, 0.06f, 12, cardBg(a.rarity));
+        if (static_cast<int>(i) == hovered) {
+            DrawRectangleLinesEx(r, 3.0f, constants::ui::kCardHoverBorder);
+        }
+
+        const char* name = fontValid_ ? a.name.c_str() : a.nameEn.c_str();
+        const char* desc = fontValid_ ? a.description.c_str() : a.descriptionEn.c_str();
+        drawText(name, r.x + 20.0f, r.y + 16.0f, 22, fg);                       // 词条名
+        drawText(rarityLabel(a.rarity, fontValid_), r.x + 20.0f, r.y + 48.0f,   // 稀有度标签
+                 14, fg);
+        drawText(desc, r.x + 20.0f, r.y + 84.0f, 16,                            // 效果描述
+                 constants::ui::kCardTextCommon);
+
+        // 快捷键标注（右下角 [n]，键盘 1/2/3 与单击均可选）
+        const std::string key = "[" + std::to_string(i + 1) + "]";
+        drawTextAligned(key.c_str(), r.x + r.width - 20.0f, r.y + r.height - 34.0f,
+                        20, constants::ui::kCardTextCommon, 2);
     }
 }

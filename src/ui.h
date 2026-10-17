@@ -3,8 +3,12 @@
 // ui.h —— UIManager：进行中游戏的 HUD
 // T6：左上 等级/经验条/血条（平滑过渡）；右上 波次/计时占位/敌人/击杀；
 //     底部居中 当前武器说明。全部屏幕空间绘制（不随镜头移动）。
-//     升级三选一/菜单/结算等界面在 T7/T10 扩展（docs/03 类图预留）。
+// T7：升级三选一卡片（稀有度配色 + 键盘 1/2/3 或鼠标点击 + 悬停描边）。
+//     菜单/结算等界面在 T10 扩展（docs/03 类图预留）。
 // ============================================================
+#include <vector>
+
+#include "affix_library.h"  // Affix：T7 升级卡片数据（名称/描述/稀有度）
 #include "raylib.h"
 
 class Player;
@@ -16,7 +20,7 @@ struct HudSnapshot {
     int   wave = 1;                  // 当前波次（T6 占位显示，T8 波次系统接管）
     float waveTimer = 0.0f;          // 波次计时（T6 占位 0，T8 接管）
     int   killCount = 0;             // 累计击杀数
-    int   level = 1;                 // 玩家等级（T6 占位，经验逻辑 T7 迁 UpgradeSystem）
+    int   level = 1;                 // 玩家等级（T7 起由 UpgradeSystem 提供）
     int   exp = 0;                   // 当前等级内经验
     float expToNext = 1.0f;          // 升下一级所需经验（docs/03 4.5 公式）
 };
@@ -34,6 +38,10 @@ public:
 
     void update(float dt, const Player& player);   // 血条显示值平滑趋近（防跳变）
     void drawHUD(const HudSnapshot& s) const;      // PLAYING 状态 HUD（屏幕空间）
+
+    // ---- T7 升级三选一（UPGRADE 状态；遮罩由 GameEngine 绘制）----
+    Rectangle upgradeCardRect(int index) const;    // 第 index(0~2) 张卡片区（逻辑坐标，供鼠标判定）
+    void drawUpgradeChoices(const std::vector<Affix>& choices, int hovered) const;
 
     // ---- 公共文字绘制（带中文字体；供 GameEngine 画操作提示/死亡占位等）----
     void drawText(const char* text, float x, float y, float size, Color color) const;

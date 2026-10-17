@@ -8,8 +8,10 @@
 // T4：武器自动索敌/开火、子弹飞行与命中判定（命中暂只移除子弹）。
 // T5：伤害结算（子弹-敌人/敌人-玩家）、击杀移除、经验点掉落与玩家受击反馈。
 // T6：HUD（等级/经验条/血条/波次占位/敌人/击杀/武器说明，屏幕空间绘制）。
+// T7：经验吸取→升级三选一（UPGRADE 状态世界静止）→词条应用；Stats 全联动；每秒生命回复。
 // ============================================================
 #include <memory>
+#include <string>
 #include <vector>
 
 #include "raylib.h"
@@ -18,7 +20,8 @@
 #include "enemy_spawner.h"  // T3 调试刷怪
 #include "projectile.h"     // 子弹容器需要完整类型（T4）
 #include "xp_orb.h"         // 经验点容器需要完整类型（T5）
-#include "ui.h"             // HUD（T6）
+#include "ui.h"             // HUD（T6）+ 升级卡片（T7）
+#include "upgrade_system.h" // 经验/等级/词条三选一（T7）
 
 // ------------------------------------------------------------
 // GameContext：各系统间的只读上下文总线（字段在后续任务补充）
@@ -48,6 +51,9 @@ public:
     GameState state() const { return state_; }
 
 private:
+    void resolveUpgradeChoice(int idx);              // T7：应用三选一第 idx 项并决定去向
+    Vector2 toLogicCoords(Vector2 winPos) const;     // T7：窗口坐标 → 逻辑坐标（鼠标判定用）
+
     GameState state_ = GameState::MAIN_MENU;
     float accumulator_ = 0.0f;    // 固定步长累积器（秒）
     RenderTexture2D renderTex_{}; // 1280x720 逻辑分辨率渲染目标
@@ -58,11 +64,19 @@ private:
     std::vector<std::unique_ptr<Projectile>> projectiles_{};  // 场上子弹容器（T4）
     std::vector<XPOrb> xpOrbs_{};   // 场上经验点（T5：击杀掉落视觉反馈；吸取 T7）
 
-    UIManager ui_{};         // 进行中游戏 HUD（T6：经验/血条/波次/击杀/武器说明）
+    UIManager ui_{};         // 进行中游戏 HUD（T6）+ 升级三选一（T7）
+    UpgradeSystem upgrade_{};  // T7：经验/等级/词条抽取与应用
     int hitCount_ = 0;      // T4 调试计数：子弹命中敌人次数
     int killCount_ = 0;     // T6：累计击杀数（右上角 HUD）
     int wave_ = 1;          // T6 占位：当前波次（T8 波次系统接管）
     float waveTimer_ = 0.0f; // T6 占位：波次计时 0（T8 接管）
-    int level_ = 1;         // T6 显示：玩家等级（经验/升级逻辑 T7 迁 UpgradeSystem）
-    int exp_ = 0;           // T6 显示：当前等级内经验（拾取 T7 累积）
+
+    std::vector<Affix> choices_{};  // T7：当前升级三选一展示
+    int hoveredCard_ = -1;          // T7：鼠标悬停卡片索引（-1 无）
+    std::string noticeText_{};      // T7：装备占位选择后提示文案
+    float noticeTimer_ = 0.0f;      // T7：提示剩余显示时间（秒）
+    float regenTimer_ = 0.0f;       // T7：每秒生命回复结算计数器
+
+    Rectangle hudDest_{0.0f, 0.0f, 1280.0f, 720.0f}; // T7：渲染目标在窗口的映射（draw 每帧更新）
+    float hudScale_ = 1.0f;         // T7：等比缩放系数（鼠标坐标逆变换用）
 };

@@ -29,6 +29,7 @@ constexpr float kMoveSpeed = 220.0f;  // 基础移速（px/s），实际移速 =
 constexpr float kStartX    = 1600.0f; // 出生点 X（场地中心）
 constexpr float kStartY    = 900.0f;  // 出生点 Y（场地中心）
 constexpr float kMaxHp     = 100.0f;  // 最大生命（docs/03 4.1）
+constexpr float kPickupRadius = 70.0f; // 基础拾取半径（px），实际 = 基础 + Stats 加成（T7 吸取）
 constexpr float kInvincibleDuration = 0.6f;   // 受击无敌帧（秒）：> 敌人攻击冷却一半，防围殴连续掉血
 constexpr float kKnockbackForce      = 240.0f; // 受击击退初速（px/s），总位移 ≈ 初速/衰减系数 = 24px
 constexpr float kKnockbackDecay      = 10.0f;  // 击退速度指数衰减系数（/s），形成"被拍开"手感
@@ -105,13 +106,29 @@ constexpr float kBaseExpNeeded = 20.0f;  // 升第 1 级所需经验
 constexpr float kExpPerLevel   = 10.0f;  // 每级递增：升 L 级所需 = 20 + 10×(L-1)
 }  // namespace upgrade
 
+// ---- 词条数值（docs/03 4.7 词条池数值表；T7 词条 apply 引用，禁止散落硬编码）----
+namespace affix {
+constexpr float kDamageBoost       = 1.15f;  // 伤害强化：伤害 ×1.15
+constexpr float kAttackSpeedBoost  = 1.10f;  // 急速：攻速 ×1.10
+constexpr float kMoveSpeedBoost    = 1.08f;  // 疾跑：移速 ×1.08
+constexpr float kHpBonus           = 20.0f;  // 强健：上限 +20 并立即回复 20
+constexpr float kBulletSpeedBoost  = 1.25f;  // 高速子弹：弹速 ×1.25
+constexpr float kPickupBonus       = 30.0f;  // 磁力：拾取半径 +30
+constexpr float kHpRegenBonus      = 1.0f;   // 生命再生：每秒回复 1 HP
+constexpr float kDamageTakenReduce = 0.9f;   // 韧性：受伤 ×0.9
+constexpr float kWeaponPlaceholderDamage      = 1.15f;  // 霰弹枪占位补偿：伤害 ×1.15（T9 换真实武器）
+constexpr float kWeaponPlaceholderAttackSpeed = 1.10f;  // 环绕飞刃占位补偿：攻速 ×1.10（T9 换真实武器）
+}  // namespace affix
+
 // ---- HUD（T6：屏幕空间 UI；颜色/字号保证深色背景下清晰）----
 namespace ui {
 constexpr const char* kFontPathYaHei  = "C:/Windows/Fonts/msyh.ttc";   // 中文字体：微软雅黑
 constexpr const char* kFontPathSimHei = "C:/Windows/Fonts/simhei.ttf"; // 回退字体：黑体
 // 中文字符集（供字体图集加载；后续任务新增 UI 文案时需在此追加对应汉字）
 constexpr const char* kCnCharSet =
-    "第波剩余时间敌人击杀手枪自动射击死亡逻辑将在后续任务实现方向键移动刷怪退出·（）";
+    "第波剩余时间敌人击杀手枪自动射击死亡逻辑将在后续任务实现方向键移动刷怪退出·（）"
+    "选择升级按或鼠标点击普通稀有史诗伤害强化攻健生命上限并回复高磁力拾取半径每秒"
+    "受伤获得暂补偿霰环绕飞刃单已取本次再韧性急促跑武器「」";
 constexpr int   kFontBaseSize  = 32;   // 字体图集基准字号（px），绘制时按需缩放
 constexpr int   kHudMargin     = 16;   // HUD 距屏幕边缘边距（px）
 constexpr int   kExpBarWidth   = 260;  // 经验条宽（px）
@@ -125,6 +142,19 @@ constexpr Color kHpBarBgColor  {150, 32, 32, 255};   // 血条底（暗红）
 constexpr Color kHpFillColor   {60, 190, 80, 255};   // 血条填充（绿）
 constexpr Color kTextMainColor {230, 230, 230, 255}; // 主文字（近白）
 constexpr Color kTextDimColor  {170, 170, 170, 255}; // 次级文字（灰）
+
+// ---- T7 升级三选一卡片（布局与配色；布局统一由 UIManager::upgradeCardRect 提供）----
+constexpr int   kCardWidth  = 340;  // 卡片宽（px）
+constexpr int   kCardHeight = 180;  // 卡片高（px）
+constexpr int   kCardGap    = 24;   // 卡片间距（px）
+constexpr Color kDimOverlay {0, 0, 0, 150};          // 升级界面全屏遮罩（压暗世界）
+constexpr Color kCardBgCommon   {52, 58, 70, 240};   // 普通卡底（白灰）
+constexpr Color kCardBgRare     {36, 64, 124, 240};  // 稀有卡底（蓝）
+constexpr Color kCardBgEpic     {96, 52, 142, 240};  // 史诗卡底（紫）
+constexpr Color kCardTextCommon {225, 225, 225, 255};// 普通文字（近白）
+constexpr Color kCardTextRare   {130, 175, 255, 255};// 稀有文字（亮蓝）
+constexpr Color kCardTextEpic   {205, 140, 255, 255};// 史诗文字（亮紫）
+constexpr Color kCardHoverBorder{250, 200, 60, 255}; // 悬停卡片描边（亮黄）
 }  // namespace ui
 
 }  // namespace constants

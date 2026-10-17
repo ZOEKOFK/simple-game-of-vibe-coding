@@ -24,15 +24,17 @@ public:
     void draw() const;                             // T2：自绘（含无敌闪烁）
 
     void takeDamage(float amount, Vector2 fromPos);  // T5：无敌帧内忽略；否则扣血并击退
-    void addWeapon(std::unique_ptr<Weapon> w);       // T7：装备类词条由此进入
+    void heal(float amount);                          // T7：回血（HP 上限截断；词条瞬时回复/每秒再生共用）
+    void addWeapon(std::unique_ptr<Weapon> w);       // T7：装备类词条由此进入（结构就绪，T9 实装武器）
 
     // ---- 查询接口（只读，供武器/UI/碰撞系统使用）----
     const Vector2& pos() const;   // 世界坐标
     float radius() const;         // 碰撞半径
     int   maxHp() const;          // 最大生命 = 基础值 + Stats 加成
     int   hp() const;             // 当前生命
-    float pickupRadius() const;   // 拾取半径
+    float pickupRadius() const;   // 拾取半径 = 基础 70 + Stats 加成
     const Stats& stats() const;   // 属性中心（词条修改点）
+    Stats& statsMutable() { return stats_; }  // 词条 apply 落点（T7）
     // T6 HUD：本局武器列表（展示当前武器名与说明；装备类词条 T7 增改）
     const std::vector<std::unique_ptr<Weapon>>& weapons() const { return weapons_; }
 

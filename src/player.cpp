@@ -27,6 +27,20 @@ int   Player::maxHp() const {  // 最大生命 = 基础值 + Stats 生命加成�
     return static_cast<int>(constants::player::kMaxHp + stats_.extraMaxHp);
 }
 int   Player::hp() const { return static_cast<int>(hp_); }  // 取整显示（伤害均为整值）
+float Player::pickupRadius() const {  // T7：拾取半径 = 基础 70 + Stats 加成（磁力词条/装备可扩）
+    return constants::player::kPickupRadius + stats_.pickupRadius;
+}
+const Stats& Player::stats() const { return stats_; }
+
+void Player::heal(float amount) {
+    hp_ += amount;
+    const float cap = static_cast<float>(maxHp());  // 上限截断："强健"提高上限后可回得更多
+    if (hp_ > cap) hp_ = cap;
+}
+
+void Player::addWeapon(std::unique_ptr<Weapon> w) {
+    weapons_.push_back(std::move(w));  // T7 结构就绪；T9 装备类词条经此接入真实武器
+}
 
 void Player::takeDamage(float amount, Vector2 fromPos) {
     if (invincibleTimer_ > 0.0f) return;  // 无敌帧内免伤（docs/03 4.1：0.6s）

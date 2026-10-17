@@ -38,8 +38,12 @@ void Pistol::fire(GameContext& ctx, const Player& player, const Vector2& targetP
     const float damage = constants::weapon::kPistolDamage *
                          (stats_ != nullptr ? stats_->damageMult : 1.0f);
 
+    // 弹速 = 基础弹速 × Stats 弹速倍率（T7 词条联动："高速子弹"生效）
+    const float bulletSpeed = constants::projectile::kBulletSpeed *
+                              (stats_ != nullptr ? stats_->bulletSpeedMult : 1.0f);
+
     // 单发：向目标方向创建一颗子弹，交给 GameEngine 统一管理
     ctx.projectiles->push_back(
-        std::make_unique<Projectile>(muzzle, dir, constants::projectile::kBulletSpeed,
+        std::make_unique<Projectile>(muzzle, dir, bulletSpeed,
                                      damage, constants::projectile::kBulletMaxRange));
 }
