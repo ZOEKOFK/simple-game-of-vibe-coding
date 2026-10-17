@@ -1,9 +1,11 @@
 // ============================================================
 // game.cpp —— GameEngine 实现
-// T1 范围：窗口初始化、固定时间步主循环（accumulator 模式）、五状态空壳切换。
+// T1：窗口初始化、固定时间步主循环（accumulator 模式）、五状态空壳切换。
+// T2：PLAYING 状态接入 八方向输入→Player 移动、摄像机跟随与竞技场绘制。
 // ============================================================
 #include "game.h"
 
+#include "arena.h"
 #include "constants.h"
 
 namespace {
@@ -21,35 +23,62 @@ const char* stateName(GameEngine::GameState s) {
     return kStateNames[static_cast<int>(s)];
 }
 
+// 汇集八方向输入：WASD + 方向键（返回未归一化方向，归一化由 Player 负责）
+Vector2 readMoveInput() {
+    Vector2 dir{0.0f, 0.0f};
+    if (IsKeyDown(KEY_A) || IsKeyDown(KEY_LEFT)) dir.x -= 1.0f;
+    if (IsKeyDown(KEY_D) || IsKeyDown(KEY_RIGHT)) dir.x += 1.0f;
+    if (IsKeyDown(KEY_W) || IsKeyDown(KEY_UP)) dir.y -= 1.0f;
+    if (IsKeyDown(KEY_S) || IsKeyDown(KEY_DOWN)) dir.y += 1.0f;
+    return dir;
+}
+
 }  // namespace
 
 void GameEngine::changeState(GameState next) { state_ = next; }
 
 void GameEngine::update(float dt) {
-    (void)dt;  // 固定步长暂未被任何玩法逻辑使用（T2 起接入）
-
-    // 【验收要求】Esc 键退出窗口
+    // 【T1 验收要求】Esc 键退出窗口（保留）
     if (IsKeyPressed(KEY_ESCAPE)) {
         CloseWindow();
         return;
     }
 
-    // 数字键 1~5 切换状态：仅用于验收"五状态空壳"，后续任务替换为真实触发条件
+    // 数字键 1~5 切换状态：仅用于验收"五状态空壳"，后续任务替换为真实触发条件（保留）
     if (IsKeyPressed(KEY_ONE)) changeState(GameState::MAIN_MENU);
     if (IsKeyPressed(KEY_TWO)) changeState(GameState::PLAYING);
     if (IsKeyPressed(KEY_THREE)) changeState(GameState::PAUSED);
     if (IsKeyPressed(KEY_FOUR)) changeState(GameState::UPGRADE);
     if (IsKeyPressed(KEY_FIVE)) changeState(GameState::GAME_OVER);
+
+    // T2：仅 PLAYING 状态响应移动（在固定步长内更新，逻辑与帧率解耦）
+    if (state_ == GameState::PLAYING) {
+        player_.update(dt, readMoveInput());
+    }
 }
 
 void GameEngine::draw() {
     // 第 1 步：把画面绘制到 1280x720 逻辑分辨率的渲染目标
     BeginTextureMode(renderTex_);
     {
-        ClearBackground(BLACK);  // 验收预期：黑色窗口
-        // 空壳阶段仅显示当前状态名（后续任务由各状态的正式内容替代）
-        DrawText(stateName(state_), 40, 40, 28, WHITE);
-        DrawText("Esc 退出 | 数字键 1~5 切换状态", 40, 80, 20, LIGHTGRAY);
+        if (state_ == GameState::PLAYING) {
+            // ---- T2：摄像机跟随 + 竞技场 + 玩家 ----
+            ClearBackground(constants::arena::kOutsideColor);  // 场外底色（近黑）
+            camera_.target = player_.pos();  // 镜头跟随：玩家恒保持屏幕中心
+            BeginMode2D(camera_);
+            {
+                drawArena();     // 地面/网格/围墙（世界坐标）
+                player_.draw();  // 玩家（世界坐标）
+            }
+            EndMode2D();
+            // 操作提示（屏幕空间；正式 UI 由 T6 实现）
+            DrawText("WASD / 方向键 移动     Esc 退出", 20, 20, 20, LIGHTGRAY);
+        } else {
+            // ---- T1 空壳展示（保留）：黑底 + 当前状态名 ----
+            ClearBackground(BLACK);  // 验收预期：黑色窗口
+            DrawText(stateName(state_), 40, 40, 28, WHITE);
+            DrawText("Esc 退出 | 数字键 1~5 切换状态", 40, 80, 20, LIGHTGRAY);
+        }
     }
     EndTextureMode();
 
@@ -91,6 +120,13 @@ void GameEngine::run() {
 
     renderTex_ = LoadRenderTexture(constants::window::kLogicWidth,
                                    constants::window::kLogicHeight);
+
+    // T2：初始化 2D 摄像机——offset 为逻辑分辨率中心、target 对准玩家出生点，
+    //     使玩家始终位于屏幕正中（target 每帧在 draw() 中跟随玩家）。
+    camera_ = Camera2D{{constants::window::kLogicWidth * 0.5f,
+                        constants::window::kLogicHeight * 0.5f},
+                       {constants::player::kStartX, constants::player::kStartY},
+                       0.0f, 1.0f};
 
     // ---- 固定时间步长主循环（accumulator 模式）----
     // 逻辑更新恒以 1/60s 步进，与显示帧率解耦，保证不同帧率下逻辑一致。

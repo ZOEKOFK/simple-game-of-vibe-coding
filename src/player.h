@@ -2,13 +2,14 @@
 // ============================================================
 // player.h —— 玩家
 // 职责：八方向移动、受击/无敌帧/击退，持有武器与 Stats。
-// T1 仅声明类与成员；移动在 T2、受击在 T5、武器装配在 T7 实现。
+// T2 已实现移动与自绘；受击在 T5、武器装配在 T7 实现。
 // ============================================================
 #include <memory>
 #include <vector>
 
-#include "raylib.h"  // Vector2
-#include "weapon.h"  // unique_ptr<Weapon> 析构需要完整类型
+#include "constants.h"  // 数值基线：半径/移速/出生点
+#include "raylib.h"     // Vector2
+#include "weapon.h"     // unique_ptr<Weapon> 析构需要完整类型
 #include "stats.h"
 
 class Player {
@@ -29,7 +30,9 @@ public:
     const Stats& stats() const;   // 属性中心（词条修改点）
 
 private:
-    Vector2 pos_{};                 // 世界坐标
+    Vector2 pos_{constants::player::kStartX,
+                 constants::player::kStartY};  // 世界坐标（T2 出生点 = 场地中心）
+    Vector2 lastMoveDir_{1.0f, 0.0f};          // 朝向 = 最后非零移动方向（朝向指示线用）
     float   hp_ = 100.0f;           // 当前生命（基线见 docs/03 数值表，T2 收编入 constants.h）
     Stats   stats_{};               // 属性中心
     Vector2 knockbackVel_{};        // 击退速度（受击瞬间赋值，逐帧衰减）
