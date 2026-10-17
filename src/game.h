@@ -12,11 +12,16 @@
 // T8：波次系统（WaveManager 状态机接管刷怪）+ 喷吐者/蛮牛差异化 AI + 敌弹伤玩家。
 // T10：完整流程闭环——主菜单开局/暂停/死亡结算/重开；resetGame 全量重置；
 //      Esc 由"退出窗口"改为"暂停切换"；数字键 1~5 状态切换调试壳移除。
+// T11：性能与体验——空间哈希网格碰撞（docs/03 2.8）、打击感（受击闪白/粒子/
+//      击杀飘字/屏幕震动/死亡定格）、程序生成音效、性能日志与 F2 压力刷怪。
 // ============================================================
 #include <memory>
 #include <string>
 #include <vector>
 
+#include "audio.h"          // 程序生成音效（T11）
+#include "collision.h"      // 空间哈希网格（T11）
+#include "effects.h"        // 打击感表现系统（T11）
 #include "raylib.h"
 #include "player.h"         // GameEngine 组合持有玩家
 #include "enemy.h"          // 敌人容器需要完整类型
@@ -41,6 +46,8 @@ struct GameContext {
     std::vector<XPOrb>* xpOrbs = nullptr;
     // T8：敌人生成器指针（WaveManager 波次投放经此委托构造，F1 调试亦复用）
     EnemySpawner* spawner = nullptr;
+    // T11：音效播放器指针（武器开火/命中经此触发；nullptr 表示音效未就绪）
+    SoundBank* audio = nullptr;
 };
 
 class GameEngine {
@@ -87,6 +94,20 @@ private:
     float survivalTime_ = 0.0f; // T10：本局存活时长（秒，PLAYING 累计，结算展示）
     bool  exitRequested_ = false; // T10：请求退出（菜单"退出"触发；主循环据此终止避免关闭后绘制）
     EndScreenStats endStats_{}; // T10：死亡瞬间汇总的本局统计（结算界面只读展示）
+
+    // T11：性能与打击感
+    collision::SpatialGrid grid_;  // 空间哈希网格（每固定步重建一次：敌人/子弹/经验点）
+    Effects effects_;              // 打击感（粒子/飘字/震动）
+    SoundBank audio_;              // 程序生成音效
+    int   perfCollisionChecks_ = 0; // 本帧碰撞比较次数（朴素：全量；网格：邻域候选数）
+    float perfTimer_ = 0.0f;        // 性能日志窗口累计（秒，≥1s 输出一行）
+    int   perfSteps_ = 0;           // 窗口内 PLAYING 固定步数
+    float perfMsSum_ = 0.0f;        // 窗口内 PLAYING 更新耗时累计（ms）
+    int   perfChecksSum_ = 0;       // 窗口内碰撞比较次数累计
+    int   perfCandSum_ = 0;         // 窗口内网格邻域候选数累计（朴素版与比较次数相同）
+    float deathTimer_ = 0.0f;       // 死亡定格计时（>0：世界冻结展示震动，倒计时结束切结算）
+
+    void logPerf();                 // T11：性能日志落盘（perf_log.txt，调试/报告素材）
 
     Rectangle hudDest_{0.0f, 0.0f, 1280.0f, 720.0f}; // T7：渲染目标在窗口的映射（draw 每帧更新）
     float hudScale_ = 1.0f;         // T7：等比缩放系数（鼠标坐标逆变换用）

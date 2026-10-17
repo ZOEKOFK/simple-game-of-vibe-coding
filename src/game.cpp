@@ -9,14 +9,17 @@
 // T8：波次系统（WaveManager 状态机接管刷怪）+ 喷吐者/蛮牛差异化 AI + 敌弹伤玩家。
 // T10：完整流程闭环——主菜单开局（Enter/点击）/Esc 暂停/HP 归零结算/重开重置；
 //      resetGame 统一重置；数字键 1~5 状态切换与 Esc 退出（T1 空壳）正式移除。
+// T11：性能与体验——空间哈希网格碰撞（docs/03 2.8）、受击闪白/命中粒子/击杀飘字/
+//      屏幕震动/死亡定格、程序生成音效、性能日志（perf_log.txt）与 F2 压力刷怪。
 // ============================================================
 #include "game.h"
 
 #include <algorithm>
+#include <cstdio>   // T11：性能日志落盘
 #include <string>
 
 #include "arena.h"
-#include "collision.h"  // T5：统一圆-圆检测
+#include "collision.h"  // T5：统一圆-圆检测；T11：空间哈希网格
 #include "constants.h"
 
 namespace {
@@ -95,6 +98,34 @@ void GameEngine::update(float dt) {
         // T10：存活时长累计（结算界面展示）
         survivalTime_ += dt;
 
+        // T11：死亡定格——HP≤0 先冻结世界 kDeathFreezeTime（死亡震动可见）再进结算；
+        //      定格期间不再移动/开火/结算，仅递减计时（死亡优先于升级，与 T10 判定一致）
+        if (player_.hp() <= 0) {
+            if (deathTimer_ > 0.0f) {
+                deathTimer_ -= dt;
+                if (deathTimer_ <= 0.0f) {
+                    // 定格结束：汇总本局统计并切 GAME_OVER
+                    endStats_.wavesSurvived = waveManager_.wave() - 1;  // 已完成波数 = 当前波号-1
+                    endStats_.killCount = killCount_;
+                    endStats_.level = upgrade_.level();
+                    endStats_.elapsedSec = survivalTime_;
+                    menuCursor_ = 0;
+                    changeState(GameState::GAME_OVER);
+                }
+            } else {
+                // 首次检测死亡：触发死亡震动 + 音效，进入定格
+                deathTimer_ = constants::fx::kDeathFreezeTime;
+                effects_.addShake(constants::fx::kShakeAmpDeath,
+                                  constants::fx::kShakeDurDeath);
+                audio_.play(SoundBank::Kind::Death);
+            }
+            return;
+        }
+
+        // T11：玩家受击震动判定基线——帧首记录 HP，伤害结算后比较下降即受击
+        const int hpBeforeDamage = player_.hp();
+        perfCollisionChecks_ = 0;  // T11：本帧碰撞比较计数清零
+
         player_.update(dt, readMoveInput());
         ui_.update(dt, player_);  // T6：血条显示值平滑趋近实际 HP
 
@@ -103,8 +134,15 @@ void GameEngine::update(float dt) {
             auto batch = spawner_.spawnWave(constants::enemy::kDebugSpawnCount, player_.pos());
             for (auto& e : batch) enemies_.push_back(std::move(e));
         }
+        // T11：F2 性能压力刷 200 只（同屏 200 敌人帧率对比验证；调试/报告素材用）
+        if (IsKeyPressed(KEY_F2)) {
+            auto batch = spawner_.spawnWave(constants::enemy::kStressSpawnCount, player_.pos());
+            for (auto& e : batch) enemies_.push_back(std::move(e));
+        }
 
-        GameContext ctx{&enemies_, &projectiles_, &player_, &xpOrbs_, &spawner_};
+        // T11：性能日志——本固定步更新耗时起点（覆盖 PLAYING 全流程，含碰撞/吸取）
+        const double stepStart = GetTime();
+        GameContext ctx{&enemies_, &projectiles_, &player_, &xpOrbs_, &spawner_, &audio_};
 
         // T8：波次状态机（WAITING 3s 倒计时 → SPAWNING 分批投放 → FIGHTING 清场判下一波）
         waveManager_.update(dt, ctx);
@@ -122,25 +160,43 @@ void GameEngine::update(float dt) {
             p->update(dt);
         }
 
-        // T5/T8/T9：子弹×敌人命中结算——朴素双循环（实体量大后的优化在 T11 换空间哈希）；
+        // T11：空间哈希网格重建（子弹移动后：登记敌人/子弹/经验点当前帧位置，
+        //      碰撞与吸取查询共享；朴素双循环已替换——精确相交仍走
+        //      circlesOverlap / 距离检查，仅候选范围缩小到邻域，行为等价）
+        grid_.clear();
+        for (const auto& e : enemies_) grid_.addEnemy(e.get());
+        for (const auto& p : projectiles_) grid_.addBullet(p.get());
+        for (auto& o : xpOrbs_) grid_.addOrb(&o);
+
+        // T5/T8/T9：子弹×敌人命中结算——空间哈希邻域查询（docs/03 2.8 落地替换朴素双循环）；
         //     仅玩家阵营弹参与敌人命中（T8：喷吐者敌弹走下方"敌弹×玩家"结算，不伤同胞）；
         //     T9 穿透：穿甲弹可穿过若干敌人，同一子弹对同一敌人只结算一次（hasHit 判重）。
         //     死亡统一在帧末移除扫描结算（击杀数/波次账本/经验掉落），保证飞刃等多种死因一致。
+        std::vector<Enemy*> hitCandidates;  // T11：邻域候选缓冲（复用避免重复分配）
         for (const auto& p : projectiles_) {
             if (!p->alive()) continue;
             if (p->faction() != Projectile::Faction::PlayerSide) continue;  // T8：敌弹跳过
-            for (const auto& e : enemies_) {
+            hitCandidates.clear();
+            grid_.queryEnemies(p->pos(), p->radius(), hitCandidates);
+            perfCollisionChecks_ += static_cast<int>(hitCandidates.size());
+            for (auto* e : hitCandidates) {
                 if (!e || e->isDead()) continue;
-                if (p->hasHit(e.get())) continue;  // T9 穿透：同弹同敌不重复结算
+                if (p->hasHit(e)) continue;  // T9 穿透：同弹同敌不重复结算
                 if (collision::circlesOverlap(p->pos(), p->radius(),
                                               e->pos(), e->radius())) {
                     ++hitCount_;
                     e->takeDamage(p->damage());
-                    p->recordHit(e.get());  // T9：命中记录（穿透判定用）
+                    p->recordHit(e);  // T9：命中记录（穿透判定用）
                     // T9 吸血：按本次结算伤害比例回血（飞刃吸血在其武器层结算）
                     if (player_.stats().lifestealPct > 0.0f) {
                         player_.heal(p->damage() * player_.stats().lifestealPct);
                     }
+                    // T11 打击感：命中火花粒子 + 命中音效（限流在 SoundBank 内）
+                    effects_.spawnBurst(e->pos(), constants::fx::kHitParticleCount,
+                                        constants::fx::kSparkColor,
+                                        constants::fx::kParticleSpeed,
+                                        constants::fx::kParticleLife);
+                    audio_.play(SoundBank::Kind::Hit);
                     if (p->pierces() > 0) {
                         p->consumePierce();  // T9：穿甲弹——消耗一次穿透继续飞行
                     } else {
@@ -153,22 +209,43 @@ void GameEngine::update(float dt) {
 
         // T8：敌方弹体 × 玩家命中结算（喷吐者弹：EnemySide 阵营；命中玩家直接结算伤害）。
         //     玩家侧无敌帧与击退在 Player::takeDamage 内统一处理——弹速 180 可走位躲开
-        for (const auto& p : projectiles_) {
+        // T11：改为空间哈希邻域查询；命中玩家时附带红色受击粒子
+        std::vector<Projectile*> playerHitCandidates;
+        grid_.queryBullets(player_.pos(), player_.radius(), playerHitCandidates);
+        perfCollisionChecks_ += static_cast<int>(playerHitCandidates.size());
+        for (auto* p : playerHitCandidates) {
             if (!p->alive() || p->faction() != Projectile::Faction::EnemySide) continue;
             if (collision::circlesOverlap(p->pos(), p->radius(),
                                           player_.pos(), player_.radius())) {
                 player_.takeDamage(p->damage(), p->pos());
                 p->markDead();
+                effects_.spawnBurst(player_.pos(), 6,
+                                   Color{255, 96, 72, 255},  // 红：玩家受击反馈
+                                   constants::fx::kParticleSpeed,
+                                   constants::fx::kParticleLife);
             }
         }
 
         // T9：死亡统一结算——所有死因（子弹/环绕飞刃/后续武器）的击杀数、波次账本、
         //     经验掉落集中在此处理，保证任意武器击杀的行为一致（对 T8 行为等价）
+        // T11：击杀打击感——爆散粒子 + 击杀数字飘字 + 击杀音效；精英（蛮牛）额外震动
         for (const auto& e : enemies_) {
             if (e && e->isDead()) {
                 ++killCount_;
                 waveManager_.notifyEnemyDied();  // T8：本波存活账本递减（清场判定）
                 xpOrbs_.emplace_back(e->pos(), static_cast<float>(e->xpValue()));
+                effects_.spawnBurst(e->pos(), constants::fx::kKillParticleCount,
+                                    constants::fx::kKillColor,
+                                    constants::fx::kParticleSpeed * 1.3f,
+                                    constants::fx::kParticleLife * 1.4f);
+                effects_.spawnKillText(e->pos(),
+                                       "+" + std::to_string(e->xpValue()),
+                                       constants::fx::kKillColor);
+                audio_.play(SoundBank::Kind::Kill);
+                if (e->isElite()) {
+                    effects_.addShake(constants::fx::kShakeAmpBrute,
+                                      constants::fx::kShakeDurBrute);
+                }
             }
         }
 
@@ -182,18 +259,39 @@ void GameEngine::update(float dt) {
                            [](const auto& p) { return !p || !p->alive(); }),
             projectiles_.end());
 
+        // T11：打击感表现更新（粒子/飘字寿命推进；震动为时间驱动，此处无需处理）
+        effects_.update(dt);
+
+        // T11：玩家受击震动——帧首记录 HP，此处比较下降即本帧受击（含接触/敌弹）
+        if (player_.hp() < hpBeforeDamage) {
+            effects_.addShake(constants::fx::kShakeAmpHurt,
+                              constants::fx::kShakeDurHurt);
+        }
+
         // T7：经验吸取——距玩家 ≤ 拾取半径的经验点自动吸收入账（升级溢出算法在 UpgradeSystem）
+        // T11：改为空间哈希邻域查询（候选过滤仍用距离平方判定，行为等价）
         const float pr = player_.pickupRadius();
         const float prSq = pr * pr;
-        for (auto it = xpOrbs_.begin(); it != xpOrbs_.end();) {
-            const float dx = it->pos().x - player_.pos().x;
-            const float dy = it->pos().y - player_.pos().y;
+        std::vector<XPOrb*> absorbed;  // 待移除经验点（循环后统一擦除，保持候选迭代器有效）
+        std::vector<XPOrb*> orbCandidates;
+        grid_.queryOrbs(player_.pos(), pr, orbCandidates);
+        perfCollisionChecks_ += static_cast<int>(orbCandidates.size());
+        for (auto* o : orbCandidates) {
+            const float dx = o->pos().x - player_.pos().x;
+            const float dy = o->pos().y - player_.pos().y;
             if (dx * dx + dy * dy <= prSq) {
-                upgrade_.addExp(static_cast<int>(it->value()), ctx);
-                it = xpOrbs_.erase(it);
-            } else {
-                ++it;
+                upgrade_.addExp(static_cast<int>(o->value()), ctx);
+                absorbed.push_back(o);
             }
+        }
+        if (!absorbed.empty()) {
+            xpOrbs_.erase(
+                std::remove_if(xpOrbs_.begin(), xpOrbs_.end(),
+                               [&](const XPOrb& orb) {
+                                   return std::find(absorbed.begin(), absorbed.end(),
+                                                    &orb) != absorbed.end();
+                               }),
+                xpOrbs_.end());
         }
 
         // T7：生命回复持续效果——每秒 tick 结算一次（生命再生词条：+1 HP/s）
@@ -208,18 +306,31 @@ void GameEngine::update(float dt) {
         // T7：装备占位提示倒计时
         if (noticeTimer_ > 0.0f) noticeTimer_ -= dt;
 
-        // T10：HP 归零 → 汇总本局统计并切 GAME_OVER（须在升级判定前：死亡优先于升级）
-        if (player_.hp() <= 0) {
-            endStats_.wavesSurvived = waveManager_.wave() - 1;  // 已完成波数 = 当前波号-1
-            endStats_.killCount = killCount_;
-            endStats_.level = upgrade_.level();
-            endStats_.elapsedSec = survivalTime_;
-            menuCursor_ = 0;
-            changeState(GameState::GAME_OVER);
-        } else if (upgrade_.hasPendingUpgrades()) {
+        // T11：性能日志累计（PLAYING 每固定步；敌人数 ≥ 阈值时每秒写一行 perf_log.txt）
+        perfTimer_ += dt;
+        ++perfSteps_;
+        perfMsSum_ += static_cast<float>(GetTime() - stepStart) * 1000.0f;
+        perfChecksSum_ += perfCollisionChecks_;
+        perfCandSum_ += grid_.candidates();
+        if (perfTimer_ >= 1.0f) {
+            perfTimer_ -= 1.0f;
+            if (static_cast<int>(enemies_.size()) >= constants::fx::kPerfLogEnemyThreshold) {
+                logPerf();  // 敌人数达标才落盘（正常战斗低频，压力测试高频）
+            } else {
+                perfSteps_ = 0;
+                perfMsSum_ = 0.0f;
+                perfChecksSum_ = 0;
+                perfCandSum_ = 0;
+            }
+        }
+
+        // T10：HP 归零 → 死亡定格已在上方接管（此判定移除）；
+        //     升级请求 → 抽三选一并切入 UPGRADE（世界暂停静止）
+        if (upgrade_.hasPendingUpgrades()) {
             // T7：经验攒满升级请求 → 抽三选一并切入 UPGRADE（世界暂停静止）
             choices_ = upgrade_.drawChoices(3, ctx);
             hoveredCard_ = -1;
+            audio_.play(SoundBank::Kind::Upgrade);  // T11：升级音效（进入三选一即播）
             changeState(GameState::UPGRADE);
         }
     } else if (state_ == GameState::UPGRADE) {
@@ -256,7 +367,7 @@ void GameEngine::resolveUpgradeChoice(int idx) {
     if (idx < 0 || idx >= static_cast<int>(choices_.size())) return;
     const Affix chosen = choices_[idx];
 
-    GameContext ctx{&enemies_, &projectiles_, &player_, &xpOrbs_, &spawner_};
+    GameContext ctx{&enemies_, &projectiles_, &player_, &xpOrbs_, &spawner_, &audio_};
     // 属性类 → 修改 Stats；装备类 → 真实装备/升级（T9），返回 1 新获得 / 2 已升级 / 0 其余
     const int result = upgrade_.applyChoice(chosen, ctx);
 
@@ -297,14 +408,28 @@ void GameEngine::draw() {
             // T10：PAUSED 同样只绘制不更新（冻结画面，叠压暗 + 暂停菜单）
             ClearBackground(constants::arena::kOutsideColor);  // 场外底色（近黑）
             camera_.target = player_.pos();  // 镜头跟随：玩家恒保持屏幕中心
+            // T11：屏幕轻微震动——摄像机偏移叠加衰减随机抖动（无震动时为 0）
+            const Vector2 shake = effects_.shakeOffset();
+            camera_.offset = Vector2{constants::window::kLogicWidth * 0.5f + shake.x,
+                                     constants::window::kLogicHeight * 0.5f + shake.y};
             BeginMode2D(camera_);
             {
                 drawArena();                                  // 地面/网格/围墙（世界坐标）
-                for (const auto& e : enemies_) e->draw();     // 敌人（世界坐标）
+                for (const auto& e : enemies_) {              // 敌人（世界坐标）
+                    e->draw();
+                    // T11：受击闪白——白色半透明层叠加（命中瞬间全亮，0.1s 内渐隐）
+                    const float fa = e->hitFlashAlpha();
+                    if (fa > 0.0f) {
+                        DrawCircleV(e->pos(), e->radius(),
+                                    Color{255, 255, 255,
+                                          static_cast<unsigned char>(140.0f * fa + 20.0f)});
+                    }
+                }
                 for (const auto& p : projectiles_) p->draw(); // 子弹（黄色小圆）
                 for (const auto& o : xpOrbs_) o.draw();       // 经验点（绿色小方块，T5）
                 player_.draw();                               // 玩家（世界坐标）
                 player_.drawWeapons();                        // T9：环绕飞刃等持续武器自绘
+                effects_.draw();  // T11：粒子与击杀飘字（世界坐标，绘制在实体之上）
             }
             EndMode2D();
             // ---- T6 HUD（屏幕空间，替换 T4/T5 左上角临时调试文字）----
@@ -324,7 +449,8 @@ void GameEngine::draw() {
 
             // 操作提示：屏幕左下角（T6 起改走中文字体，避免默认字体乱码）
             // T10：Esc 语义由"退出"改为"暂停"（退出走菜单项）
-            ui_.drawText("WASD / 方向键 移动     F1 调试刷怪     Esc 暂停",
+            // T11：F2 性能压力刷怪（调试/报告素材用）
+            ui_.drawText("WASD / 方向键 移动     F1 调试刷怪    F2 压力刷怪    Esc 暂停",
                          20.0f, constants::window::kLogicHeight - 36.0f,
                          16, LIGHTGRAY);
             // T7：装备占位提示（选择到装备类词条后屏幕中央显示 3 秒）
@@ -400,6 +526,13 @@ void GameEngine::run() {
                                    constants::window::kLogicHeight);
     ui_.load();  // T6：HUD 中文字体（LoadFontEx 需要 GL 上下文，必须在 InitWindow 后）
 
+    // T11：音频设备与程序生成音效（InitAudioDevice 在 InitWindow 之后；失败静默降级）
+    InitAudioDevice();
+    if (IsAudioDeviceReady()) {
+        audio_.init();
+        SetMasterVolume(0.5f);  // 总体音量压半，避免合成音效突兀
+    }
+
     // T2：初始化 2D 摄像机——offset 为逻辑分辨率中心、target 对准玩家出生点，
     //     使玩家始终位于屏幕正中（target 每帧在 draw() 中跟随玩家）。
     camera_ = Camera2D{{constants::window::kLogicWidth * 0.5f,
@@ -427,6 +560,8 @@ void GameEngine::run() {
     }
 
     ui_.unload();  // T6：窗口关闭前释放字体资源（避免 GL 上下文失效后析构报错）
+    audio_.unload();      // T11：释放程序生成音效资源（CloseAudioDevice 前）
+    CloseAudioDevice();   // T11：音频设备收尾（InitAudioDevice 成功后对称关闭）
     UnloadRenderTexture(renderTex_);
     CloseWindow();
 }
@@ -449,6 +584,15 @@ void GameEngine::resetGame() {
     noticeText_.clear();
     regenTimer_ = 0.0f;         // 生命回复 tick 计数器清零
     endStats_ = EndScreenStats{};  // 结算统计复位
+    // T11：打击感与性能状态复位——清空粒子/飘字/震动，死亡定格与性能累计归零
+    effects_.clear();
+    grid_.clear();
+    deathTimer_ = 0.0f;
+    perfTimer_ = 0.0f;
+    perfSteps_ = 0;
+    perfMsSum_ = 0.0f;
+    perfChecksSum_ = 0;
+    perfCandSum_ = 0;
 }
 
 int GameEngine::handleMenuInput(int itemCount) {
@@ -482,4 +626,26 @@ int GameEngine::handleMenuInput(int itemCount) {
 
     if (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE)) return menuCursor_;
     return -1;
+}
+
+void GameEngine::logPerf() {
+    // T11：性能日志——同屏敌人 ≥ 阈值时每秒写一行 perf_log.txt（报告性能优化量化素材）。
+    // 输出：存活时间/敌人数/实时 FPS/本秒平均单固定步更新耗时/每秒平均碰撞比较次数
+    //（朴素版为全量次数；网格版为邻域候选数，含比较次数下界）/网格候选数。
+    if (perfSteps_ <= 0) return;
+    FILE* f = std::fopen("perf_log.txt", "a");
+    if (f != nullptr) {
+        std::fprintf(f,
+                     "[PERF] t=%.1f enemies=%d fps=%d avg_step_ms=%.2f "
+                     "collision_checks=%d grid_candidates=%d\n",
+                     survivalTime_, static_cast<int>(enemies_.size()), GetFPS(),
+                     perfMsSum_ / static_cast<float>(perfSteps_),
+                     perfChecksSum_ / perfSteps_,
+                     perfCandSum_ / perfSteps_);
+        std::fclose(f);
+    }
+    perfSteps_ = 0;
+    perfMsSum_ = 0.0f;
+    perfChecksSum_ = 0;
+    perfCandSum_ = 0;
 }

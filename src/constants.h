@@ -69,6 +69,7 @@ constexpr int   kCrawlerXpValue        = 5;     // 击杀经验（T5 只作掉�
 
 // 生成规则（T3 调试用，正式波次 T8 接入）
 constexpr int   kDebugSpawnCount    = 10;     // F1 一次刷怪数量
+constexpr int   kStressSpawnCount   = 200;    // F2 性能压力刷怪数量（T11：同屏 200 敌人验证）
 constexpr float kSpawnMinPlayerDist = 400.0f; // 出生点距玩家最小距离，防骑脸
 constexpr float kSpawnOutsideDepth  = 36.0f;  // 墙外出生：距墙外缘的深度（px），敌人从场外入场
 
@@ -256,5 +257,31 @@ constexpr Color kMenuBgHoverEdge {255, 220, 120, 255};  // 选中项描边（金
 constexpr Color kMenuTextColor   {232, 232, 232, 255};  // 菜单项文字（近白）
 constexpr Color kGameOverRed     {255, 96, 72, 255};    // 结算标题（红）
 }  // namespace ui
+
+// ---- 空间哈希碰撞网格（T11；docs/03 2.8 落地）----
+namespace collision {
+constexpr int   kCellSize        = 160;  // 网格单元边长（px）：竞技场 3200×1800 → 20×11 格
+constexpr float kMaxEntityRadius = 32.0f; // 邻域查询扩展半径：覆盖最大实体半径（蛮牛 28）+ 余量
+}  // namespace collision
+
+// ---- 打击感与性能日志（T11）----
+namespace fx {
+constexpr float kHitFlashDuration = 0.10f;   // 受击闪白时长（秒）
+constexpr float kShakeAmpHurt     = 3.0f;    // 玩家受击轻微震动幅度（px）
+constexpr float kShakeDurHurt     = 0.15f;   // 受击震动时长（秒）
+constexpr float kShakeAmpBrute    = 7.0f;    // 蛮牛（精英）死亡震动幅度（px）
+constexpr float kShakeDurBrute    = 0.35f;   // 蛮牛死亡震动时长（秒）
+constexpr float kShakeAmpDeath    = 11.0f;   // 玩家死亡震动幅度（px，定格期间可见）
+constexpr float kShakeDurDeath    = 0.50f;   // 玩家死亡震动时长（秒）
+constexpr float kDeathFreezeTime  = 0.35f;   // 死亡定格时长（秒）：震动展示后进结算界面
+constexpr int   kHitParticleCount = 5;       // 子弹命中粒子数
+constexpr int   kKillParticleCount = 12;     // 击杀爆散粒子数
+constexpr float kParticleSpeed    = 160.0f;  // 粒子初速（px/s）
+constexpr float kParticleLife     = 0.25f;   // 粒子寿命（秒）
+constexpr float kKillTextLife     = 0.8f;    // 击杀飘字存活（秒）
+constexpr Color kSparkColor {255, 200, 90, 255};    // 命中火花（金黄）
+constexpr Color kKillColor  {90, 230, 130, 255};    // 击杀爆散 + 飘字（绿）
+constexpr int   kPerfLogEnemyThreshold = 40;        // 性能日志触发：场上敌人数 ≥ 该值才输出
+}  // namespace fx
 
 }  // namespace constants

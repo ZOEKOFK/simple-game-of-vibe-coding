@@ -85,6 +85,8 @@ void Weapon::update(float dt, GameContext& ctx, const Player& player) {
     // 3) 到点开火：具体开火模式（单发/散射/持续）由子类覆写 fire()/update() 实现
     if (fireTimer_ <= 0.0f) {
         fire(ctx, player, target->pos());
+        // T11：射击音效（限流在 SoundBank 内；环绕飞刃整体覆写 update() 不触发）
+        if (ctx.audio != nullptr) ctx.audio->play(SoundBank::Kind::Shoot);
         // T7 词条联动：实际间隔 = 基础间隔 ÷ 攻速倍率（急速/神速生效；环绕飞刃无间隔不参与）
         fireTimer_ = fireInterval_ /
                      (stats_ != nullptr ? stats_->attackSpeedMult : 1.0f);

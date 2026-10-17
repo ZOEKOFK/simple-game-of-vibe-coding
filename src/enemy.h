@@ -6,6 +6,7 @@
 // T3：状态字段、update 主调、接触标志与查询接口；
 // T5：接触攻击冷却与伤害结算、takeDamage 扣血/死亡标记、经验掉落。
 // ============================================================
+#include "constants.h"  // 数值基线（含 T11 fx 常量）
 #include "raylib.h"
 
 struct GameContext;
@@ -21,6 +22,15 @@ public:
     bool isDead() const;
     virtual void draw() const = 0;            // 子类自绘（如红色圆形，与玩家区分）
     void scaleHp(float multiplier);           // T8：波次生命倍率（出生时调用一次：maxHp/hp 同乘）
+
+    // T11：受击闪白——takeDamage 触发闪白计时，返回 0~1 剩余强度供绘制叠加白色半透明层
+    float hitFlashAlpha() const {
+        return (hitFlashTimer_ > 0.0f)
+                   ? hitFlashTimer_ / constants::fx::kHitFlashDuration
+                   : 0.0f;
+    }
+    // T11：精英标记——蛮牛等精英死亡时触发更强震动（基类默认非精英）
+    virtual bool isElite() const { return false; }
 
     // ---- 通用属性查询 ----
     const Vector2& pos() const;
@@ -46,4 +56,5 @@ protected:
     int     xpValue_ = 0;             // 击杀经验掉落
     bool    isDead_ = false;          // 死亡标志（hp≤0 置位，由 GameEngine 移除实体）
     bool    touchingPlayer_ = false;  // 接触中：与玩家距离 < 两半径和
+    float   hitFlashTimer_ = 0.0f;    // T11：受击闪白剩余时长（秒，>0 时绘制白色叠加层）
 };

@@ -17,6 +17,9 @@ void Enemy::update(float dt, const Vector2& playerPos, GameContext& ctx) {
     // 接触攻击冷却递减：每只敌人独立计时，避免围殴时每帧伤血（docs/03 4.3：0.8s）
     if (attackCooldown_ > 0.0f) attackCooldown_ -= dt;
 
+    // T11：受击闪白计时递减（绘制时按剩余占比叠加白色层）
+    if (hitFlashTimer_ > 0.0f) hitFlashTimer_ -= dt;
+
     touchingPlayer_ = false;   // 每帧重置，由子类 decide 重新判定
     decide(dt, playerPos, ctx);  // 子类差异化 AI（移动/接触标记）
 
@@ -30,6 +33,8 @@ void Enemy::update(float dt, const Vector2& playerPos, GameContext& ctx) {
 
 bool Enemy::takeDamage(float amount) {
     hp_ -= amount;
+    // T11：受击闪白——无论是否死亡均触发（死亡帧的白色叠加在移除前可见）
+    hitFlashTimer_ = constants::fx::kHitFlashDuration;
     if (hp_ <= 0.0f) {
         hp_ = 0.0f;       // 锁 0，避免负生命
         isDead_ = true;   // 死亡标志：由 GameEngine 掉落经验点并移除实体

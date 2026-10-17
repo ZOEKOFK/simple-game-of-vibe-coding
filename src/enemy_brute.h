@@ -12,6 +12,7 @@ public:
     explicit Brute(const Vector2& spawnPos);  // 出生点由 EnemySpawner 注入
 
     void draw() const override;               // 深红大圆；蓄力变红闪烁+方向箭头；冲锋亮红+尾迹
+    bool isElite() const override { return true; }  // T11：精英——死亡时触发更强屏幕震动
 
 protected:
     void decide(float dt, const Vector2& playerPos, GameContext& ctx) override;  // 蓄力冲锋状态机
