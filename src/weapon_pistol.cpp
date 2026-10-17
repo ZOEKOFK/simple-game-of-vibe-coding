@@ -1,4 +1,45 @@
-// weapon_pistol.cpp —— 手枪实现与注册（T4）
-// 注册示范：
-//   static bool registered = []{ Weapon::registerWeapon("pistol", ...); return true; }();
+// weapon_pistol.cpp —— 手枪实现（T4：单发开火；工厂注册 T9 接入）
 #include "weapon_pistol.h"
+
+#include <memory>
+
+#include "constants.h"
+#include "game.h"        // GameContext：子弹容器
+#include "player.h"      // Player 位置/属性
+#include "projectile.h"
+#include "raymath.h"     // Vector2Length
+#include "stats.h"       // 伤害倍率（默认 1.0）
+
+Pistol::Pistol(const Stats* stats)
+    : Weapon(constants::weapon::kPistolFireInterval,
+             constants::weapon::kPistolDamage,
+             constants::weapon::kPistolRange) {
+    stats_ = stats;       // 只读引用：伤害 = 基础伤害 × damageMult（词条 T7 生效）
+    typeId_ = "pistol";  // 注册名（UI 展示/强化判重用）
+}
+
+void Pistol::fire(GameContext& ctx, const Player& player, const Vector2& targetPos) {
+    if (ctx.projectiles == nullptr) return;
+
+    // 枪口朝向锁定索敌目标：从玩家圆心指向目标归一化（无误差偏移）
+    Vector2 dir{targetPos.x - player.pos().x, targetPos.y - player.pos().y};
+    const float len = Vector2Length(dir);
+    if (len > 0.0001f) {
+        dir.x /= len;
+        dir.y /= len;
+    } else {
+        dir = Vector2{1.0f, 0.0f};  // 与目标重合时兜底朝右
+    }
+
+    const Vector2 muzzle{player.pos().x + dir.x * constants::weapon::kMuzzleOffset,
+                         player.pos().y + dir.y * constants::weapon::kMuzzleOffset};
+
+    // 伤害 = 基础伤害 × Stats 伤害倍率（Stats 默认 1.0；词条加成 T7）
+    const float damage = constants::weapon::kPistolDamage *
+                         (stats_ != nullptr ? stats_->damageMult : 1.0f);
+
+    // 单发：向目标方向创建一颗子弹，交给 GameEngine 统一管理
+    ctx.projectiles->push_back(
+        std::make_unique<Projectile>(muzzle, dir, constants::projectile::kBulletSpeed,
+                                     damage, constants::projectile::kBulletMaxRange));
+}

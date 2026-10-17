@@ -68,4 +68,20 @@ constexpr Color kCrawlerOutlineColor {110, 30, 25, 255};
 constexpr Color kContactColor        {255, 210, 90, 255};
 }  // namespace enemy
 
+// ---- 武器（docs/03 4.6 数值基线；T4 先落地手枪）----
+namespace weapon {
+constexpr float kPistolFireInterval = 1.0f / 2.4f;  // 攻击间隔（秒）≈0.4167，即射速 2.4 发/秒
+constexpr float kPistolDamage       = 10.0f;        // 单发伤害（爬行者 20 HP 恰为两枪）
+constexpr float kPistolRange        = 600.0f;       // 索敌射程（px）：只锁定射程内最近敌人
+constexpr float kMuzzleOffset       = 20.0f;        // 枪口偏移：玩家圆心外移（半径 14 + 余量）
+}  // namespace weapon
+
+// ---- 子弹（docs/03 4.6：弹速 600、射程 900）----
+namespace projectile {
+constexpr float kBulletRadius   = 4.0f;    // 子弹碰撞半径
+constexpr float kBulletSpeed    = 600.0f;  // 弹速（px/s），方向在开火时归一化
+constexpr float kBulletMaxRange = 900.0f;  // 最大射程（px），超出自动消失
+constexpr Color kBulletColor    {255, 210, 60, 255};  // 黄色小圆
+}  // namespace projectile
+
 }  // namespace constants

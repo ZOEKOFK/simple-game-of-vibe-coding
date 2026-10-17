@@ -3,9 +3,11 @@
 // T1：窗口初始化、固定时间步主循环（accumulator 模式）、五状态空壳切换。
 // T2：PLAYING 状态接入 八方向输入→Player 移动、摄像机跟随与竞技场绘制。
 // T3：F1 调试刷怪 + 敌人追踪/分离 AI 更新与绘制、临调敌人数显示。
+// T4：武器自动索敌/开火、子弹飞行与命中判定（命中暂只移除子弹）、命中次数显示。
 // ============================================================
 #include "game.h"
 
+#include <algorithm>
 #include <string>
 
 #include "arena.h"
@@ -64,11 +66,43 @@ void GameEngine::update(float dt) {
             for (auto& e : batch) enemies_.push_back(std::move(e));
         }
 
+        GameContext ctx{&enemies_, &projectiles_};
+
         // T3：敌人 AI 更新（追踪 + 分离 + 接触标记；伤害结算 T5）
-        GameContext ctx{&enemies_};
         for (const auto& e : enemies_) {
             e->update(dt, player_.pos(), ctx);
         }
+
+        // T4：武器自动索敌/开火（射程内最近敌人；无目标不开火）
+        player_.updateWeapons(dt, ctx);
+
+        // T4：子弹飞行（射程衰减/出界失效）
+        for (const auto& p : projectiles_) {
+            p->update(dt);
+        }
+
+        // T4：子弹×敌人命中判定——朴素双循环（实体量大后的优化在 T11 换空间哈希）；
+        //     命中暂只移除子弹并计数，伤害与击杀 T5 结算
+        for (const auto& p : projectiles_) {
+            if (!p->alive()) continue;
+            for (const auto& e : enemies_) {
+                if (!e) continue;
+                const float rr = p->radius() + e->radius();
+                const float dx = p->pos().x - e->pos().x;
+                const float dy = p->pos().y - e->pos().y;
+                if (dx * dx + dy * dy <= rr * rr) {
+                    p->markDead();
+                    ++hitCount_;
+                    break;
+                }
+            }
+        }
+
+        // 移除已失效子弹（命中/超射程/出界）
+        projectiles_.erase(
+            std::remove_if(projectiles_.begin(), projectiles_.end(),
+                           [](const auto& p) { return !p || !p->alive(); }),
+            projectiles_.end());
     }
 }
 
@@ -82,15 +116,18 @@ void GameEngine::draw() {
             camera_.target = player_.pos();  // 镜头跟随：玩家恒保持屏幕中心
             BeginMode2D(camera_);
             {
-                drawArena();                              // 地面/网格/围墙（世界坐标）
-                for (const auto& e : enemies_) e->draw(); // 敌人（世界坐标）
-                player_.draw();                           // 玩家（世界坐标）
+                drawArena();                                  // 地面/网格/围墙（世界坐标）
+                for (const auto& e : enemies_) e->draw();     // 敌人（世界坐标）
+                for (const auto& p : projectiles_) p->draw(); // 子弹（黄色小圆）
+                player_.draw();                               // 玩家（世界坐标）
             }
             EndMode2D();
             // 操作提示与临调显示（屏幕空间；正式 UI 由 T6 实现）
             DrawText("WASD / 方向键 移动    F1 刷怪    Esc 退出", 20, 20, 20, LIGHTGRAY);
             const std::string countText = "敌人数量: " + std::to_string(enemies_.size());
             DrawText(countText.c_str(), 20, 48, 20, GOLD);
+            const std::string hitText = "命中次数: " + std::to_string(hitCount_);
+            DrawText(hitText.c_str(), 20, 68, 20, YELLOW);
         } else {
             // ---- T1 空壳展示（保留）：黑底 + 当前状态名 ----
             ClearBackground(BLACK);  // 验收预期：黑色窗口

@@ -12,6 +12,7 @@
 #include "player.h"         // GameEngine 组合持有玩家
 #include "enemy.h"          // 敌人容器需要完整类型
 #include "enemy_spawner.h"  // T3 调试刷怪
+#include "projectile.h"     // 子弹容器需要完整类型（T4）
 
 // ------------------------------------------------------------
 // GameContext：各系统间的只读上下文总线（字段在后续任务补充）
@@ -20,7 +21,9 @@
 struct GameContext {
     // T3：敌人列表指针（供敌人 AI 分离力等只读遍历；由 GameEngine 更新时填充）
     std::vector<std::unique_ptr<Enemy>>* enemies = nullptr;
-    // 预留：子弹容器 / 经验点容器 / 玩家引用（T4~T5 补充）
+    // T4：子弹容器指针（武器开火生成子弹的唯一落点，由 GameEngine 统一管理）
+    std::vector<std::unique_ptr<Projectile>>* projectiles = nullptr;
+    // 预留：经验点容器 / 玩家引用（T5 补充）
 };
 
 class GameEngine {
@@ -44,4 +47,6 @@ private:
     Camera2D camera_{};           // 跟随玩家的 2D 摄像机（仅 PLAYING 生效）
     std::vector<std::unique_ptr<Enemy>> enemies_{};  // 场上敌人容器（T3）
     EnemySpawner spawner_{};      // 敌人生成器（T3 F1 调试刷怪）
+    std::vector<std::unique_ptr<Projectile>> projectiles_{};  // 场上子弹容器（T4）
+    int hitCount_ = 0;            // T4 调试计数：子弹命中敌人次数（伤害结算 T5）
 };

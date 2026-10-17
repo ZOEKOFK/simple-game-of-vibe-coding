@@ -1,9 +1,24 @@
-// player.cpp —— Player 实现（T2：八方向移动 + 边界钳制 + 自绘；T5 受击、T7 武器接入）
+// player.cpp —— Player 实现（T2：移动+自绘；T4：初始手枪与武器驱动；T5 受击、T7 装备）
 #include "player.h"
 
-#include "raymath.h"  // Vector2Length（raylib.h 未包含 raymath，需显式引入）
+#include <memory>
+
 #include "arena.h"
 #include "constants.h"
+#include "raymath.h"        // Vector2Length（raylib.h 未包含 raymath，需显式引入）
+#include "weapon_pistol.h"  // 初始武器：手枪
+
+Player::Player() {
+    // 开局初始装备：手枪（docs/01 FR-05；本局武器列表随升级扩充）
+    weapons_.push_back(std::make_unique<Pistol>(&stats_));
+}
+
+void Player::updateWeapons(float dt, GameContext& ctx) {
+    // 逐武器驱动：索敌/冷却/开火逻辑封装在 Weapon 基类主流程中
+    for (auto& w : weapons_) {
+        w->update(dt, ctx, *this);
+    }
+}
 
 const Vector2& Player::pos() const { return pos_; }  // 供镜头跟随等只读查询
 

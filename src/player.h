@@ -2,7 +2,7 @@
 // ============================================================
 // player.h —— 玩家
 // 职责：八方向移动、受击/无敌帧/击退，持有武器与 Stats。
-// T2 已实现移动与自绘；受击在 T5、武器装配在 T7 实现。
+// T2 已实现移动与自绘；T4 持有初始手枪并逐帧驱动武器；受击 T5、装备词条 T7。
 // ============================================================
 #include <memory>
 #include <vector>
@@ -12,10 +12,15 @@
 #include "weapon.h"     // unique_ptr<Weapon> 析构需要完整类型
 #include "stats.h"
 
+struct GameContext;  // 前向声明（定义在 game.h），武器驱动经此读写世界
+
 class Player {
 public:
+    Player();                                       // 开局自带初始武器（手枪）
+
     // ---- 行为接口 ----
     void update(float dt, Vector2 inputDir);       // T2：移动 + 无敌帧/击退衰减
+    void updateWeapons(float dt, GameContext& ctx);  // T4：逐武器索敌/冷却/开火
     void draw() const;                             // T2：自绘（含无敌闪烁）
 
     void takeDamage(float amount, Vector2 fromPos);  // T5：无敌帧内忽略；否则扣血并击退
