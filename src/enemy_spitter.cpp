@@ -50,8 +50,10 @@ void Spitter::decide(float dt, const Vector2& playerPos, GameContext& ctx) {
 }
 
 void Spitter::draw() const {
-    // T12：蓝衣人贴图替代几何圆形——尺寸≈2.4×碰撞半径；
-    //     叠加暗蓝描边环，保留"远程兵"识别色语义（与爬行者红/玩家蓝区分）
+    // T13：Tiny Dungeon 红色小恶魔 tile 替换 T12 蓝衣人贴图——尺寸≈2.4×碰撞半径；
+    //     叠加暗紫描边环，保留"远程兵"识别色语义（与爬行者史莱姆区分）
+    DrawEllipse(static_cast<int>(pos_.x), static_cast<int>(pos_.y + radius_ * 0.15f),
+                radius_ * 1.0f, radius_ * 0.45f, Color{0, 0, 0, 55});
     assets::drawCentered(assets::enemySpitter(), pos_, radius_ * 2.4f, 0.0f, WHITE);
     DrawCircleLines(static_cast<int>(pos_.x), static_cast<int>(pos_.y), radius_ + 3.0f,
                     constants::enemy::kSpitterOutlineColor);

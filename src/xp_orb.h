@@ -10,7 +10,7 @@ class XPOrb {
 public:
     XPOrb(const Vector2& pos, float value);
 
-    void draw() const;               // 绿色小方块（临时视觉反馈）
+    void draw() const;               // T13 程序化六边形青绿宝石（脉动+自转+光晕）
 
     // ---- 查询接口 ----
     const Vector2& pos() const { return pos_; }  // T7 拾取判定用

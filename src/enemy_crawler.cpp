@@ -63,8 +63,10 @@ void Crawler::decide(float dt, const Vector2& playerPos, GameContext& ctx) {
 }
 
 void Crawler::draw() const {
-    // T12：僵尸贴图替代几何圆形——尺寸≈2.4×碰撞半径（视觉略大于碰撞盒）；
+    // T13：Tiny Dungeon 青绿史莱姆 tile 替换 T12 僵尸贴图——尺寸≈2.4×碰撞半径；
     //     接触中时叠加亮黄描边环（保留可观察的接触标记语义）
+    DrawEllipse(static_cast<int>(pos_.x), static_cast<int>(pos_.y + radius_ * 0.15f),
+                radius_ * 1.0f, radius_ * 0.45f, Color{0, 0, 0, 55});
     assets::drawCentered(assets::enemyCrawler(), pos_, radius_ * 2.4f, 0.0f, WHITE);
     if (touchingPlayer_) {
         DrawCircleLines(static_cast<int>(pos_.x), static_cast<int>(pos_.y), radius_ + 3.0f,

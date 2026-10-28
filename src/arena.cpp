@@ -39,7 +39,34 @@ void drawArena() {
     DrawRectangleRec({kWidth - kWallThickness, kWallThickness,
                       kWallThickness, kHeight - 2.0f * kWallThickness},
                      kWallColor);                                       // 右
-    // 4. 墙内缘高亮描边，强化可活动边界
+    // 4. 墙外缘深色层 + 墙身砖缝线（T13：增强墙体厚度与警戒质感，纯视觉不动物理）
+    constexpr float kOuterRim = 8.0f;     // 墙外缘深色层厚度（视觉分层）
+    constexpr float kBrickStep = 24.0f;   // 砖缝间距（px）
+    DrawRectangleRec({0.0f, 0.0f, kWidth, kOuterRim}, kWallOuter);                // 上外缘
+    DrawRectangleRec({0.0f, kHeight - kOuterRim, kWidth, kOuterRim}, kWallOuter); // 下外缘
+    DrawRectangleRec({0.0f, 0.0f, kOuterRim, kHeight}, kWallOuter);               // 左外缘
+    DrawRectangleRec({kWidth - kOuterRim, 0.0f, kOuterRim, kHeight}, kWallOuter); // 右外缘
+    for (float x = kBrickStep; x < kWidth; x += kBrickStep) {                     // 上/下墙竖缝
+        DrawLineEx({x, kOuterRim}, {x, kWallThickness}, 1.5f, kWallSeam);
+        DrawLineEx({x, kHeight - kWallThickness}, {x, kHeight - kOuterRim}, 1.5f, kWallSeam);
+    }
+    for (float y = kWallThickness + kBrickStep; y < kHeight - kWallThickness;
+         y += kBrickStep) {                                                       // 左/右墙横缝
+        DrawLineEx({kOuterRim, y}, {kWallThickness, y}, 1.5f, kWallSeam);
+        DrawLineEx({kWidth - kWallThickness, y}, {kWidth - kOuterRim, y}, 1.5f, kWallSeam);
+    }
+    // 5. 地面贴墙一圈内缘阴影带（T13：地面→墙过渡加深，俯视纵深感；纯视觉）
+    constexpr float kInnerShade = 6.0f;
+    const Color shade{0, 0, 0, 42};
+    DrawRectangleRec({kWallThickness, kWallThickness, kWidth - 2.0f * kWallThickness,
+                      kInnerShade}, shade);
+    DrawRectangleRec({kWallThickness, kHeight - kWallThickness - kInnerShade,
+                      kWidth - 2.0f * kWallThickness, kInnerShade}, shade);
+    DrawRectangleRec({kWallThickness, kWallThickness, kInnerShade,
+                      kHeight - 2.0f * kWallThickness}, shade);
+    DrawRectangleRec({kWidth - kWallThickness - kInnerShade, kWallThickness, kInnerShade,
+                      kHeight - 2.0f * kWallThickness}, shade);
+    // 6. 墙内缘高亮描边，强化可活动边界（保持最后绘制，轮廓最清晰）
     DrawRectangleLinesEx({kWallThickness, kWallThickness,
                           kWidth - 2.0f * kWallThickness,
                           kHeight - 2.0f * kWallThickness},

@@ -22,7 +22,7 @@ public:
                Faction faction = Faction::PlayerSide);
 
     void update(float dt);   // 飞行 + 射程衰减 + 出界失效
-    void draw() const;       // 黄色小圆（T4 玩家弹表现）
+    void draw() const;       // T13 程序化弹体：玩家橙金发光弹 / 敌方红紫魔法弹
 
     // ---- 查询接口（碰撞检测/伤害结算用）----
     const Vector2& pos() const { return pos_; }

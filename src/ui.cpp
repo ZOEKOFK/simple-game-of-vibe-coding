@@ -30,6 +30,14 @@ Color cardText(Rarity r) {
         default:           return constants::ui::kCardTextCommon;
     }
 }
+// T13：卡片描边按稀有着色（普通灰 / 稀有蓝 / 史诗亮紫），取代原先统一亮黄
+Color cardEdge(Rarity r) {
+    switch (r) {
+        case Rarity::Rare: return constants::ui::kCardEdgeRare;
+        case Rarity::Epic: return constants::ui::kCardEdgeEpic;
+        default:           return constants::ui::kCardEdgeCommon;
+    }
+}
 const char* rarityLabel(Rarity r, bool cn) {
     switch (r) {
         case Rarity::Rare: return cn ? "稀有" : "Rare";
@@ -126,48 +134,74 @@ void UIManager::drawHUD(const HudSnapshot& s) const {
     const int W = constants::window::kLogicWidth;
     if (s.player == nullptr) return;
 
-    // ---- 左上：等级 + 经验条 + 血条 ----
-    const std::string lvText = "Lv." + std::to_string(s.level);
-    drawText(lvText.c_str(), static_cast<float>(m), static_cast<float>(m) - 4.0f, 22,
-             constants::ui::kExpBarColor);
+    // ---- 左上面板：等级菱形徽章 + 经验/血条（T13 圆角半透明面板 + 渐变条）----
+    const float px = static_cast<float>(m) - 8.0f;  // 面板左缘（比旧裸条布局更靠边，视觉统一）
+    const float py = static_cast<float>(m) - 8.0f;  // 面板上缘
+    constexpr float kLeftBarW = 170.0f;   // 条宽（面板右侧留文本）
+    const Rectangle panel{px, py, 300.0f, 60.0f};
+    DrawRectangleRounded(panel, 0.16f, 12, constants::ui::kPanelBg);
+    DrawRectangleRoundedLines(panel, 0.16f, 12, 1.5f, constants::ui::kPanelEdge);
 
-    // 经验条（黄）：填充比例 = 当前经验 / 升级所需
-    const float expX = static_cast<float>(m);
-    const float expY = static_cast<float>(m) + 30.0f;
+    // 等级菱形徽章：金色外框 + 深色内底 + 等级数字（左上角视觉锚点）
+    const Vector2 badgeC{px + 24.0f, py + 23.0f};
+    DrawRectanglePro(Rectangle{badgeC.x, badgeC.y, 26.0f, 26.0f}, Vector2{13.0f, 13.0f},
+                     45.0f, constants::ui::kGoldAccent);
+    DrawRectanglePro(Rectangle{badgeC.x, badgeC.y, 19.0f, 19.0f}, Vector2{9.5f, 9.5f},
+                     45.0f, constants::ui::kBadgeInner);
+    const std::string lv = std::to_string(s.level);
+    drawTextAligned(lv.c_str(), badgeC.x, badgeC.y - 8.0f, 13,
+                    constants::ui::kGoldAccent, 1);
+
+    // 经验条（填充比例 = 当前经验 / 升级所需；渐变金填充 + 右侧金色数值）
+    const float barX = px + 52.0f;
+    const float expY = py + 6.0f;
     const float expPct = s.expToNext > 0.0f ? s.exp / s.expToNext : 0.0f;
-    DrawRectangle(static_cast<int>(expX), static_cast<int>(expY),
-                  constants::ui::kExpBarWidth, constants::ui::kExpBarHeight,
-                  constants::ui::kBarBgColor);
-    DrawRectangle(static_cast<int>(expX), static_cast<int>(expY),
-                  static_cast<int>(constants::ui::kExpBarWidth * clamp01(expPct)),
-                  constants::ui::kExpBarHeight, constants::ui::kExpBarColor);
+    DrawRectangleRounded(Rectangle{barX, expY, kLeftBarW, 12.0f}, 0.5f, 8,
+                         constants::ui::kBarBgColor);
+    const float expFill = clamp01(expPct);
+    if (expFill > 0.0f) {
+        BeginScissorMode(static_cast<int>(barX), static_cast<int>(expY),
+                         static_cast<int>(kLeftBarW * expFill), 12);
+        DrawRectangleGradientV(static_cast<int>(barX), static_cast<int>(expY),
+                               static_cast<int>(kLeftBarW), 12,
+                               constants::ui::kExpFillTop, constants::ui::kExpFillBottom);
+        EndScissorMode();
+    }
     const std::string expText =
         std::to_string(s.exp) + " / " + std::to_string(static_cast<int>(s.expToNext));
-    drawText(expText.c_str(), expX + constants::ui::kExpBarWidth + 8.0f, expY - 2.0f, 16,
-             constants::ui::kTextDimColor);
+    drawTextAligned(expText.c_str(), px + 300.0f - 10.0f, expY - 3.0f, 13,
+                    constants::ui::kKillTextGold, 2);
 
-    // 血条（红底绿条）：宽度按平滑显示值比例；数字显示实际 HP
-    const float hpX = static_cast<float>(m);
-    const float hpY = expY + constants::ui::kExpBarHeight + 8.0f;
+    // 血条（暗红底 + 渐变绿填充）：宽度按平滑显示值比例；数字显示实际 HP
+    const float hpY = py + 30.0f;
     const float maxHp = static_cast<float>(s.player->maxHp());
     const float hpPct = maxHp > 0.0f ? displayHp_ / maxHp : 0.0f;
-    DrawRectangle(static_cast<int>(hpX), static_cast<int>(hpY),
-                  constants::ui::kHpBarWidth, constants::ui::kHpBarHeight,
-                  constants::ui::kHpBarBgColor);
-    DrawRectangle(static_cast<int>(hpX), static_cast<int>(hpY),
-                  static_cast<int>(constants::ui::kHpBarWidth * clamp01(hpPct)),
-                  constants::ui::kHpBarHeight, constants::ui::kHpFillColor);
+    DrawRectangleRounded(Rectangle{barX, hpY, kLeftBarW, 16.0f}, 0.5f, 8,
+                         constants::ui::kHpBarBgColor);
+    const float hpFill = clamp01(hpPct);
+    if (hpFill > 0.0f) {
+        BeginScissorMode(static_cast<int>(barX), static_cast<int>(hpY),
+                         static_cast<int>(kLeftBarW * hpFill), 16);
+        DrawRectangleGradientV(static_cast<int>(barX), static_cast<int>(hpY),
+                               static_cast<int>(kLeftBarW), 16,
+                               constants::ui::kHpFillTop, constants::ui::kHpFillBottom);
+        EndScissorMode();
+    }
     const std::string hpText = std::to_string(s.player->hp()) + " / " +
                                std::to_string(s.player->maxHp());
-    drawTextAligned(hpText.c_str(), hpX + constants::ui::kHpBarWidth * 0.5f,
-                    hpY + 1.0f, 16, constants::ui::kTextMainColor, 1);
+    drawTextAligned(hpText.c_str(), barX + kLeftBarW * 0.5f, hpY + 1.0f, 15,
+                    constants::ui::kTextMainColor, 1);
 
-    // ---- 右上：第 X 波 / 波次状态行（T8）/ 敌人 / 击杀 ----
-    const float rightX = static_cast<float>(W - m);
+    // ---- 右上面板：波次 / 状态行（T8）/ 敌人 / 击杀 ----
+    constexpr float kRightW = 230.0f;
+    constexpr float kRightH = 92.0f;
+    const Rectangle rp{W - m + 8.0f - kRightW, py, kRightW, kRightH};
+    DrawRectangleRounded(rp, 0.16f, 12, constants::ui::kPanelBg);
+    DrawRectangleRoundedLines(rp, 0.16f, 12, 1.5f, constants::ui::kPanelEdge);
     const std::string waveText = fontValid_ ? ("第 " + std::to_string(s.wave) + " 波")
                                             : ("Wave " + std::to_string(s.wave));
-    drawTextAligned(waveText.c_str(), rightX, static_cast<float>(m) - 4.0f, 20,
-                    constants::ui::kTextMainColor, 2);
+    drawTextAligned(waveText.c_str(), rp.x + kRightW - 12.0f, rp.y + 8.0f, 19,
+                    constants::ui::kGoldAccent, 2);
 
     // T8 状态行：0 波间倒计时（3,2,1）/ 1 刷怪中剩余投放 / 2 清场剩余敌人
     std::string stateText;
@@ -177,7 +211,7 @@ void UIManager::drawHUD(const HudSnapshot& s) const {
         stateText = fontValid_
             ? ("下一波 " + std::to_string(s.wave) + ": " + std::to_string(countdown))
             : ("Next wave " + std::to_string(s.wave) + ": " + std::to_string(countdown));
-        stateColor = constants::ui::kExpBarColor;  // 黄色：提示即将开刷
+        stateColor = constants::ui::kGoldAccent;  // 金色：提示即将开刷
     } else if (s.waveState == 1) {
         stateText = fontValid_ ? ("刷怪中 剩余 " + std::to_string(s.remainingToSpawn))
                                : ("Spawning: " + std::to_string(s.remainingToSpawn));
@@ -185,17 +219,18 @@ void UIManager::drawHUD(const HudSnapshot& s) const {
         stateText = fontValid_ ? ("剩余敌人 " + std::to_string(s.aliveInWave))
                                : ("Enemies left: " + std::to_string(s.aliveInWave));
     }
-    drawTextAligned(stateText.c_str(), rightX, static_cast<float>(m) + 30.0f, 16,
+    drawTextAligned(stateText.c_str(), rp.x + kRightW - 12.0f, rp.y + 36.0f, 15,
                     stateColor, 2);
     const std::string enemyText = fontValid_ ? ("敌人: " + std::to_string(s.enemyCount))
                                              : ("Enemies: " + std::to_string(s.enemyCount));
-    drawTextAligned(enemyText.c_str(), rightX, static_cast<float>(m) + 52.0f, 16, GOLD, 2);
+    drawText(enemyText.c_str(), rp.x + 14.0f, rp.y + 64.0f, 15,
+             constants::ui::kEnemyTextRed);
     const std::string killText = fontValid_ ? ("击杀: " + std::to_string(s.killCount))
                                             : ("Kills: " + std::to_string(s.killCount));
-    drawTextAligned(killText.c_str(), rightX, static_cast<float>(m) + 74.0f, 16,
-                    constants::ui::kTextMainColor, 2);
+    drawTextAligned(killText.c_str(), rp.x + kRightW - 12.0f, rp.y + 64.0f, 15,
+                    constants::ui::kKillTextGold, 2);
 
-    // ---- 底部居中：本局武器列表（T9：多武器逐个拼接"名 · 说明"，字体回退时拼注册名）----
+    // ---- 底部居中：本局武器列表（T13 加半透明圆角底框；文案拼接逻辑不变）----
     const auto& weapons = s.player->weapons();
     if (!weapons.empty()) {
         std::string label;
@@ -209,8 +244,15 @@ void UIManager::drawHUD(const HudSnapshot& s) const {
                 label += weapons[i]->typeId();
             }
         }
-        drawTextAligned(label.c_str(), W * 0.5f,
-                        constants::window::kLogicHeight - m - 26.0f, 20,
+        const Vector2 tw = measureText(label.c_str(), 18.0f);
+        const float bw = tw.x + 56.0f;
+        const float bx = (W - bw) * 0.5f;
+        const float by = constants::window::kLogicHeight - m - 40.0f;
+        DrawRectangleRounded(Rectangle{bx, by, bw, 34.0f}, 0.5f, 10,
+                             constants::ui::kPanelBg);
+        DrawRectangleRoundedLines(Rectangle{bx, by, bw, 34.0f}, 0.5f, 10, 1.5f,
+                                  constants::ui::kPanelEdge);
+        drawTextAligned(label.c_str(), W * 0.5f, by + 7.0f, 18,
                         constants::ui::kTextMainColor, 1);
     }
 }
@@ -233,23 +275,52 @@ void UIManager::drawMenuRows(const std::vector<std::string>& items, int cursor) 
     for (size_t i = 0; i < items.size(); ++i) {
         const Rectangle r = menuRowRect(static_cast<int>(i));
         const bool sel = static_cast<int>(i) == cursor;
-        // 底：未选中深灰 / 选中高亮蓝 + 金描边（与升级卡片一致的圆角风格）
-        DrawRectangleRounded(r, 0.10f, 10, sel ? constants::ui::kMenuBgHover
+        // T13：圆角底（未选中深蓝灰 / 选中高亮蓝）+ 选中金描边 + 左侧金色指示条
+        DrawRectangleRounded(r, 0.14f, 10, sel ? constants::ui::kMenuBgHover
                                                : constants::ui::kMenuBgNormal);
-        if (sel) DrawRectangleLinesEx(r, 2.0f, constants::ui::kMenuBgHoverEdge);
+        if (sel) {
+            DrawRectangleRoundedLines(r, 0.14f, 10, 2.0f,
+                                      constants::ui::kMenuBgHoverEdge);
+            DrawRectangleRounded(Rectangle{r.x + 10.0f, r.y + 12.0f, 5.0f, r.height - 24.0f},
+                                 0.5f, 4, constants::ui::kMenuBgHoverEdge);
+        } else {
+            DrawRectangleRoundedLines(r, 0.14f, 10, 1.5f, constants::ui::kPanelEdge);
+        }
         drawTextAligned(items[i].c_str(), r.x + r.width * 0.5f,
-                        r.y + (r.height - 26.0f) * 0.5f, 26, constants::ui::kMenuTextColor, 1);
+                        r.y + (r.height - 26.0f) * 0.5f, 26,
+                        sel ? constants::ui::kMenuTextColor
+                            : constants::ui::kTextDimColor, 1);
     }
 }
 
 void UIManager::drawMainMenu(int cursor) const {
     const float cx = constants::window::kLogicWidth * 0.5f;
+    const float W = static_cast<float>(constants::window::kLogicWidth);
+    const float H = static_cast<float>(constants::window::kLogicHeight);
 
-    // 标题：中文大标题 + 英文副标题（字体不可用整屏回退英文）
-    drawTextAligned(fontValid_ ? "竞技场幸存者" : "ARENA SURVIVOR",
-                    cx, 150.0f, 64, constants::ui::kMenuTitleColor, 1);
+    // T13：深蓝渐变 + 淡网格纹理背景（主菜单氛围底，替代纯黑）
+    DrawRectangleGradientV(0, 0, static_cast<int>(W), static_cast<int>(H),
+                           Color{26, 34, 56, 255}, Color{8, 10, 18, 255});
+    for (float x = 0.0f; x < W; x += 96.0f)
+        DrawLineEx(Vector2{x, 0.0f}, Vector2{x, H}, 1.0f, Color{120, 140, 190, 16});
+    for (float y = 0.0f; y < H; y += 96.0f)
+        DrawLineEx(Vector2{0.0f, y}, Vector2{W, y}, 1.0f, Color{120, 140, 190, 16});
+
+    // 标题两侧金色菱形装饰
+    DrawRectanglePro(Rectangle{cx - 320.0f, 172.0f, 16.0f, 16.0f}, Vector2{8.0f, 8.0f},
+                     45.0f, constants::ui::kGoldAccent);
+    DrawRectanglePro(Rectangle{cx + 320.0f, 172.0f, 16.0f, 16.0f}, Vector2{8.0f, 8.0f},
+                     45.0f, constants::ui::kGoldAccent);
+
+    // 标题：投影 + 主层双层偏移（无 shader 的发光感）；字体不可用整屏回退英文
+    const char* title = fontValid_ ? "竞技场幸存者" : "ARENA SURVIVOR";
+    drawTextAligned(title, cx + 4.0f, 154.0f, 64, constants::ui::kTextShadow, 1);
+    drawTextAligned(title, cx, 150.0f, 64, constants::ui::kMenuTitleColor, 1);
     if (fontValid_) {
-        drawTextAligned("Arena Survivor", cx, 235.0f, 22, constants::ui::kMenuSubColor, 1);
+        drawTextAligned("Arena Survivor", cx, 236.0f, 22, constants::ui::kMenuSubColor, 1);
+        // 标题下细分隔线
+        DrawLineEx(Vector2{cx - 110.0f, 300.0f}, Vector2{cx + 110.0f, 300.0f}, 2.0f,
+                   Color{255, 200, 70, 90});
     }
 
     // 菜单项：开始 / 退出
@@ -272,9 +343,10 @@ void UIManager::drawMainMenu(int cursor) const {
 
 void UIManager::drawPauseMenu(int cursor) const {
     const float cx = constants::window::kLogicWidth * 0.5f;
-    // 引擎已先压暗冻结画面，这里只画"已暂停"标题与三项选择
-    drawTextAligned(fontValid_ ? "已暂停" : "PAUSED",
-                    cx, 300.0f, 48, constants::ui::kMenuTitleColor, 1);
+    // 引擎已先压暗冻结画面，这里只画"已暂停"标题（带投影）与三项选择
+    const char* title = fontValid_ ? "已暂停" : "PAUSED";
+    drawTextAligned(title, cx + 3.0f, 303.0f, 48, constants::ui::kTextShadow, 1);
+    drawTextAligned(title, cx, 300.0f, 48, constants::ui::kMenuTitleColor, 1);
 
     std::vector<std::string> items;
     items.push_back(fontValid_ ? "继续游戏" : "Resume");
@@ -290,15 +362,25 @@ void UIManager::drawPauseMenu(int cursor) const {
 
 void UIManager::drawGameOverScreen(const EndScreenStats& s, int cursor) const {
     const float cx = constants::window::kLogicWidth * 0.5f;
+    const float W = static_cast<float>(constants::window::kLogicWidth);
+    const float H = static_cast<float>(constants::window::kLogicHeight);
 
-    // 标题与副标题
-    drawTextAligned(fontValid_ ? "游戏结束" : "GAME OVER",
-                    cx, 110.0f, 60, constants::ui::kGameOverRed, 1);
+    // T13：结算深红渐变底（压暗冻结战场之上，氛围统一）
+    DrawRectangleGradientV(0, 0, static_cast<int>(W), static_cast<int>(H),
+                           Color{46, 18, 24, 255}, Color{10, 8, 14, 255});
+
+    // 标题与副标题（标题带投影层）
+    const char* title = fontValid_ ? "游戏结束" : "GAME OVER";
+    drawTextAligned(title, cx + 4.0f, 114.0f, 60, constants::ui::kTextShadow, 1);
+    drawTextAligned(title, cx, 110.0f, 60, constants::ui::kGameOverRed, 1);
     if (fontValid_) {
         drawTextAligned("你倒下了", cx, 185.0f, 24, constants::ui::kMenuSubColor, 1);
     }
 
-    // 本局统计：存活波次 / 总击杀 / 等级 / 存活时长（≥60s 显示 X 分 Y 秒）
+    // 本局统计：圆角面板内逐行展示（存活波次 / 总击杀 / 等级 / 存活时长）
+    const Rectangle statsPanel{cx - 240.0f, 236.0f, 480.0f, 180.0f};
+    DrawRectangleRounded(statsPanel, 0.12f, 12, constants::ui::kPanelBg);
+    DrawRectangleRoundedLines(statsPanel, 0.12f, 12, 1.5f, constants::ui::kPanelEdge);
     const int mins = static_cast<int>(s.elapsedSec / 60.0f);
     const int secs = static_cast<int>(s.elapsedSec) % 60;
     std::vector<std::string> lines;
@@ -314,9 +396,12 @@ void UIManager::drawGameOverScreen(const EndScreenStats& s, int cursor) const {
         lines.push_back("Level: " + std::to_string(s.level));
         lines.push_back("Time: " + std::to_string(mins) + "m " + std::to_string(secs) + "s");
     }
-    float ly = 250.0f;
-    for (const auto& line : lines) {
-        drawTextAligned(line.c_str(), cx, ly, 22, constants::ui::kTextMainColor, 1);
+    float ly = 254.0f;
+    for (size_t i = 0; i < lines.size(); ++i) {
+        // 奇偶行微调亮度：斑马纹提升可读性
+        drawTextAligned(lines[i].c_str(), cx, ly, 22,
+                        i % 2 == 0 ? constants::ui::kTextMainColor
+                                   : constants::ui::kKillTextGold, 1);
         ly += 38.0f;
     }
 
@@ -354,9 +439,10 @@ void UIManager::drawUpgradeChoices(const std::vector<Affix>& choices, int hovere
     const float cx = constants::window::kLogicWidth * 0.5f;  // 水平中轴
     const Rectangle first = upgradeCardRect(0);
 
-    // 标题（卡片上方）与操作提示（卡片下方）；字体不可用整体回退英文
-    drawTextAligned(fontValid_ ? "选择升级" : "LEVEL UP", cx,
-                    first.y - 64.0f, 32, constants::ui::kTextMainColor, 1);
+    // 标题（金色 + 投影层，卡片上方）与操作提示（卡片下方）；字体不可用整体回退英文
+    const char* title = fontValid_ ? "选择升级" : "LEVEL UP";
+    drawTextAligned(title, cx + 2.0f, first.y - 62.0f, 32, constants::ui::kTextShadow, 1);
+    drawTextAligned(title, cx, first.y - 64.0f, 32, constants::ui::kGoldAccent, 1);
     drawTextAligned(fontValid_ ? "按 1 / 2 / 3 或鼠标点击选择"
                                : "Press 1 / 2 / 3 or click to choose",
                     cx, first.y + constants::ui::kCardHeight + 24.0f, 18,
@@ -364,14 +450,28 @@ void UIManager::drawUpgradeChoices(const std::vector<Affix>& choices, int hovere
 
     for (size_t i = 0; i < choices.size() && i < 3; ++i) {
         const Affix& a = choices[i];
-        const Rectangle r = upgradeCardRect(static_cast<int>(i));
+        Rectangle r = upgradeCardRect(static_cast<int>(i));  // 复制：悬停上浮是纯绘制位移
+        const bool hover = static_cast<int>(i) == hovered;
+        if (hover) r.y -= 12.0f;  // T13：悬停卡片上浮
         const Color fg = cardText(a.rarity);
+        const Color edge = cardEdge(a.rarity);
+        // 史诗卡描边脉动（金紫呼吸光），普通/稀有恒定
+        float pulse = 1.0f;
+        if (a.rarity == Rarity::Epic) pulse = 0.72f + 0.28f * std::sinf(GetTime() * 4.0f);
+        const Color edgeP{edge.r, edge.g, edge.b,
+                          static_cast<unsigned char>(edge.a * pulse)};
 
-        // 卡片底（稀有度配色）+ 悬停亮黄描边
-        DrawRectangleRounded(r, 0.06f, 12, cardBg(a.rarity));
-        if (static_cast<int>(i) == hovered) {
-            DrawRectangleLinesEx(r, 3.0f, constants::ui::kCardHoverBorder);
+        // 悬停外发光：卡片外圈粗描边（扩充层）
+        if (hover) {
+            DrawRectangleRoundedLines(Rectangle{r.x - 5.0f, r.y - 5.0f,
+                                                r.width + 10.0f, r.height + 10.0f},
+                                      0.10f, 16, 5.0f, Color{255, 214, 96, 80});
         }
+
+        // 卡片底（稀有度配色）+ 稀有度描边 + 卡顶色条
+        DrawRectangleRounded(r, 0.06f, 12, cardBg(a.rarity));
+        DrawRectangleRoundedLines(r, 0.06f, 12, hover ? 3.0f : 2.0f, edgeP);
+        DrawRectangleRec(Rectangle{r.x + 16.0f, r.y + 8.0f, r.width - 32.0f, 3.0f}, edgeP);
 
         // T9 装备类动态文案：已持有该武器 → 展示"升级武器：伤害 +N"（N 取自
         // upgradeDamageAmount()，与真实升级增量一致；不同武器 N 不同，见 docs/05 §4.1）
@@ -390,10 +490,17 @@ void UIManager::drawUpgradeChoices(const std::vector<Affix>& choices, int hovere
                 desc = ownedDesc.c_str();
             }
         }
-        drawText(name, r.x + 20.0f, r.y + 16.0f, 22, fg);                       // 词条名
-        drawText(rarityLabel(a.rarity, fontValid_), r.x + 20.0f, r.y + 48.0f,   // 稀有度标签
-                 14, fg);
-        drawText(desc, r.x + 20.0f, r.y + 84.0f, 16,                            // 效果描述
+        drawText(name, r.x + 20.0f, r.y + 20.0f, 22, fg);                       // 词条名
+
+        // 稀有度标签：文字底片（圆角深色片 + 稀有度色文字）
+        const char* rl = rarityLabel(a.rarity, fontValid_);
+        const Vector2 rlSize = measureText(rl, 14.0f);
+        DrawRectangleRounded(Rectangle{r.x + 16.0f, r.y + 48.0f,
+                                       rlSize.x + 22.0f, 24.0f},
+                             0.5f, 8, constants::ui::kChipBg);
+        drawText(rl, r.x + 27.0f, r.y + 53.0f, 14, fg);
+
+        drawText(desc, r.x + 20.0f, r.y + 88.0f, 16,                            // 效果描述
                  constants::ui::kCardTextCommon);
 
         // 快捷键标注（右下角 [n]，键盘 1/2/3 与单击均可选）

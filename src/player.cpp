@@ -133,8 +133,13 @@ void Player::draw() const {
     // 无敌帧闪烁（T5）：每 0.2s 隐藏半周期，视觉提示"无敌中"
     if (invincibleTimer_ > 0.0f && std::fmod(invincibleTimer_, 0.2f) < 0.1f) return;
 
-    // T12：玩家贴图替代几何圆形——以朝向旋转、尺寸≈2.2×碰撞半径（视觉略大于碰撞盒）
+    // T13：Tiny Dungeon 骑士 tile（正面朝下）。阴影椭圆垫底增强俯视立体感；
+    //     旋转基准修正：tile 原型朝屏幕下方（"下方"向量 (0,+1) 对应 atan2(1,0)=90°），
+    //     故 atan2 角度再 -90° 使剑/面甲指向移动方向。视觉宽度≈2.6×碰撞半径，
+    //     贴图已按透明包围盒裁剪（见 assets.cpp），视觉即绘制尺寸。
     const float r = constants::player::kRadius;
-    const float deg = std::atan2(lastMoveDir_.y, lastMoveDir_.x) * (180.0f / PI) + 90.0f;
-    assets::drawCentered(assets::player(), pos_, r * 2.2f, deg, WHITE);
+    const float deg = std::atan2(lastMoveDir_.y, lastMoveDir_.x) * (180.0f / PI) - 90.0f;
+    DrawEllipse(static_cast<int>(pos_.x), static_cast<int>(pos_.y + r * 0.2f),
+                r * 1.05f, r * 0.5f, Color{0, 0, 0, 60});
+    assets::drawCentered(assets::player(), pos_, r * 2.6f, deg, WHITE);
 }

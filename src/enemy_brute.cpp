@@ -133,6 +133,10 @@ void Brute::draw() const {
             body = kBruteColor;  // 追踪/疲惫：深红本体
             break;
     }
+    // T13：Tiny Dungeon 食人魔 tile 替换 T12 机器人贴图——阴影椭圆垫底，
+    //     蓄力/冲锋 tint 与警戒环/箭头/拖尾等状态语义全部保留（仅本体贴图更换）
+    DrawEllipse(static_cast<int>(pos_.x), static_cast<int>(pos_.y + radius_ * 0.12f),
+                radius_ * 1.02f, radius_ * 0.45f, Color{0, 0, 0, 60});
     assets::drawCentered(assets::enemyBrute(), pos_, size, 0.0f, body);
     DrawCircleLines(static_cast<int>(pos_.x), static_cast<int>(pos_.y), radius_,
                     constants::enemy::kBruteOutlineColor);

@@ -45,10 +45,12 @@ constexpr float kGridLineThickness = 1.0f; // 网格线粗细（px）
 
 // ---- 配色：深色地面+暗网格区分场地；围墙醒目橙红；场外近黑 ----
 constexpr Color kOutsideColor  {12, 14, 18, 255};   // 场外底色（近黑）
-constexpr Color kGroundColor   {28, 32, 42, 255};   // 内场地面（深蓝灰）
-constexpr Color kGridColor     {42, 48, 62, 255};   // 网格线（暗灰蓝）
+constexpr Color kGroundColor   {22, 26, 36, 255};   // 内场地面（T13 调深：衬托像素贴图与弹体发光）
+constexpr Color kGridColor     {46, 52, 70, 150};   // 网格线（暗灰蓝半透明：更淡不抢眼）
 constexpr Color kWallColor     {204, 68, 48, 255};  // 围墙主体（醒目橙红）
 constexpr Color kWallEdgeColor {255, 140, 96, 255}; // 墙内缘高亮描边
+constexpr Color kWallOuter     {128, 36, 28, 255};  // T13 墙外缘深色层（厚度感）
+constexpr Color kWallSeam      {116, 34, 26, 150};  // T13 墙身砖缝线（半透明）
 }  // namespace arena
 
 // ---- 敌人（docs/03 4.3 数值基线；T3 先落地爬行者）----
@@ -168,14 +170,27 @@ namespace projectile {
 constexpr float kBulletRadius   = 4.0f;    // 子弹碰撞半径
 constexpr float kBulletSpeed    = 600.0f;  // 弹速（px/s），方向在开火时归一化
 constexpr float kBulletMaxRange = 900.0f;  // 最大射程（px），超出自动消失
-constexpr Color kBulletColor    {255, 210, 60, 255};  // 黄色小圆
-constexpr Color kEnemyBulletColor {255, 90, 90, 255}; // T8 敌方弹体：红橙色圆（与玩家黄弹区分）
+// ---- T13 程序化弹体配色（T12 贴图已废弃；绘制只用色值，碰撞尺寸 kBulletRadius 不变）----
+constexpr Color kBulletColor      {255, 195, 64, 255};  // 玩家弹外圈（橙金）
+constexpr Color kBulletCoreColor  {255, 245, 200, 255}; // 玩家弹内芯（亮白黄）
+constexpr Color kBulletTrailColor {255, 140, 40, 150};  // 玩家弹尾部拖尾（半透明橙）
+constexpr Color kEnemyBulletColor {214, 58, 108, 255};  // 敌弹外圈（深红紫）
+constexpr Color kEnemyBulletCoreColor {255, 168, 208, 255}; // 敌弹内芯（粉）
+constexpr Color kEnemyBulletGlowColor {255, 90, 140, 60};   // 敌弹外围魔光（低透明）
+constexpr float kBulletVisualSize = 26.0f;  // T13 弹体视觉长度（px）≈6.5×碰撞半径：醒目且不影响碰撞
 }  // namespace projectile
 
 // ---- 经验点（T5：击杀掉落视觉反馈；拾取与吸取 T7）----
 namespace xp_orb {
 constexpr float kSize = 12.0f;  // 绿色小方块边长（px）
-constexpr Color kColor {60, 220, 120, 255};  // 绿色（与敌人红、子弹黄区分）
+constexpr float kVisualSize = 30.0f;  // T12 经验宝石视觉尺寸（px）≈2.5×边长：掉落醒目
+constexpr float kPulseAmp   = 0.15f;  // T12 脉动呼吸幅度（±15% 缩放）
+constexpr float kPulseSpeed = 4.0f;   // T12 脉动角速度（rad/s）
+constexpr float kSpinSpeed  = 1.4f;   // T13 宝石慢速自转角速度（rad/s）
+constexpr Color kGemDark    {30, 150, 104, 255};   // T13 程序化宝石主体暗面（青绿深）
+constexpr Color kGemLight   {118, 244, 172, 255};  // 高光面（青绿亮）
+constexpr Color kGemEdge    {226, 255, 240, 255};  // 描边（近白）
+constexpr Color kGemGlow    {66, 210, 150, 44};    // 呼吸光晕（低透明青绿）
 }  // namespace xp_orb
 
 // ---- 升级（docs/03 4.5 经验曲线；T6 仅显示，升级逻辑 T7 迁 UpgradeSystem）----
@@ -224,12 +239,29 @@ constexpr int   kExpBarHeight  = 12;   // 经验条高（px）
 constexpr int   kHpBarWidth    = 260;  // 血条宽（px）
 constexpr int   kHpBarHeight   = 18;   // 血条高（px）
 constexpr float kHpLerpSpeed   = 8.0f; // 血条平滑趋近速度（/s，指数趋近避免跳变）
-constexpr Color kExpBarColor   {240, 180, 40, 255};  // 经验条填充（黄）
-constexpr Color kBarBgColor    {40, 44, 54, 255};    // 条底（深灰）
-constexpr Color kHpBarBgColor  {150, 32, 32, 255};   // 血条底（暗红）
-constexpr Color kHpFillColor   {60, 190, 80, 255};   // 血条填充（绿）
-constexpr Color kTextMainColor {230, 230, 230, 255}; // 主文字（近白）
-constexpr Color kTextDimColor  {170, 170, 170, 255}; // 次级文字（灰）
+constexpr Color kExpBarColor   {255, 200, 70, 255};  // 经验条强调（琥珀金；T13 填充改渐变，此色作亮端基准）
+constexpr Color kBarBgColor    {20, 26, 40, 240};    // 条底（深蓝黑半透明）
+constexpr Color kHpBarBgColor  {64, 24, 30, 240};    // 血条底（暗红半透明）
+constexpr Color kHpFillColor   {74, 190, 92, 255};   // 血条填充（绿）
+constexpr Color kTextMainColor {235, 235, 238, 255}; // 主文字（近白）
+constexpr Color kTextDimColor  {168, 172, 186, 255}; // 次级文字（灰蓝）
+
+// ---- T13 界面美化（仅绘制层配色；鼠标判定布局同源，数值不动）----
+constexpr Color kPanelBg      {14, 20, 34, 214};   // HUD 面板底（半透明深蓝黑）
+constexpr Color kPanelEdge    {94, 108, 140, 235}; // 面板描边（灰蓝）
+constexpr Color kGoldAccent   {255, 200, 70, 255}; // 主色：琥珀金（等级/波次/击杀强调）
+constexpr Color kBadgeInner   {36, 32, 22, 255};   // 等级菱形徽章内底
+constexpr Color kExpFillTop   {255, 220, 104, 255};// 经验条渐变亮端
+constexpr Color kExpFillBottom{226, 148, 30, 255}; // 经验条渐变暗端
+constexpr Color kHpFillTop    {128, 232, 130, 255};// 血条渐变亮端
+constexpr Color kHpFillBottom {30, 146, 66, 255};  // 血条渐变暗端
+constexpr Color kEnemyTextRed {255, 122, 112, 255};// 敌人计数（红）
+constexpr Color kKillTextGold {255, 214, 96, 255}; // 击杀计数（金）
+constexpr Color kTextShadow   {0, 0, 0, 160};      // 标题投影
+constexpr Color kCardEdgeCommon {166, 176, 190, 255}; // 普通卡描边
+constexpr Color kCardEdgeRare   {112, 168, 255, 255}; // 稀有卡描边（蓝）
+constexpr Color kCardEdgeEpic   {228, 178, 255, 255}; // 史诗卡描边（亮紫）
+constexpr Color kChipBg       {0, 0, 0, 70};       // 稀有度标签底
 
 // ---- T7 升级三选一卡片（布局与配色；布局统一由 UIManager::upgradeCardRect 提供）----
 constexpr int   kCardWidth  = 340;  // 卡片宽（px）
